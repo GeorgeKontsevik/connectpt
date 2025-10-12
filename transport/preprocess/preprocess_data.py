@@ -1,4 +1,5 @@
 from typing import Dict, List, Tuple
+import warnings
 import pandas as pd
 import geopandas as gpd
 import networkx as nx
@@ -9,6 +10,8 @@ from .stops import get_agg_stops
 from .lines import get_lines
 from .projection import project_stops_on_roads
 from .network import roads_to_graph, stop_complete_then_prune, build_time_matrix
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def preprocess(blocks : gpd.GeoDataFrame, modalities : list[Modality]) : 
@@ -85,6 +88,8 @@ def preprocess(blocks : gpd.GeoDataFrame, modalities : list[Modality]) :
         largest_cc_nodes = max(nx.connected_components(simplified_graph), key=len)  # Узлы самой большой компоненты
         simplified_graph_largest = simplified_graph.subgraph(largest_cc_nodes).copy()  # Создаем подграф
         stops_gdf, _ = mp.nx_to_gdf(simplified_graph_largest)
+
+        stops_gdf["modality"] = modality.value
         
         stops_gdf[['x_coord', 'y_coord']] = stops_gdf.geometry.apply(lambda p: pd.Series([p.x, p.y]))
         stops_gdf['x_coord'] = stops_gdf['x_coord'].round(2)

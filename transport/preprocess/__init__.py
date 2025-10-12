@@ -17,6 +17,16 @@ Typical usage:
 
 import importlib
 
+__version__ = importlib.metadata.version("transport")
+
 from .types import Modality
 from .preprocess_data import preprocess
 from .od import get_OD
+
+# import importlib
+
+#  # TODO поменять название в соответствии с pyproject.toml
+# __author__ = "Vasilii Starikov"
+# __email__ = "vasilstar97@gmail.com"
+# __credits__ = []
+# __license__ = "BSD-3"

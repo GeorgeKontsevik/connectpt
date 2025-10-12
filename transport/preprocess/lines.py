@@ -1,3 +1,4 @@
+import warnings
 import geopandas as gpd
 import pygeoops
 import osmnx as ox
@@ -13,6 +14,8 @@ from .types import Modality, MODALITY_LINE_TAGS
 from .utils import _close_gaps, restore_linestrings
 
 ox.settings.useful_tags_way.append("railway")
+warnings.filterwarnings("ignore", category=UserWarning)
+
 
 
 def _get_electric_lines(polygon: Polygon | MultiPolygon, filter_tags: str) -> gpd.GeoDataFrame:

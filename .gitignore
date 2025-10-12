@@ -42,3 +42,7 @@ ENV/
 
 # PyCharm env
 .idea
+
+# Local caches for examples
+# .examples/cache/   
+examples/cache/    
