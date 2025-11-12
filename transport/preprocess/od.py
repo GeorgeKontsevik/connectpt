@@ -85,6 +85,13 @@ def get_OD(blocks: gpd.GeoDataFrame, stops: gpd.GeoDataFrame, walk_graph: networ
         'LandUse.RESIDENTIAL': 0.1,
         'LandUse.AGRICULTURE': 0.05,
         'LandUse.RECREATION': 0.05
+        # 'industrial': 0.25,
+        # 'business': 0.3,
+        # 'special': 0.1,
+        # 'transport': 0.1,
+        # 'residential': 0.1,
+        # 'agriculture': 0.05,
+        # 'recreation': 0.05
     }
     blocks['lu_coeff'] = blocks['land_use'].apply(lambda x: landuse_coeff.get(x, 0))
     blocks['attractiveness'] = blocks['density'] + blocks['diversity'] + blocks['lu_coeff']
@@ -104,7 +111,7 @@ def get_OD(blocks: gpd.GeoDataFrame, stops: gpd.GeoDataFrame, walk_graph: networ
     for i, row in walk_mx.iterrows():
         walk_dict[i] = []
         for j, value in row.items():
-            if value <= 10:  # Max 10 minutes walking time
+            if value <= 10:  # Max 10 minutes time
                 walk_dict[i].append((j, value))
         if len(walk_dict[i]) == 0:
             walk_dict[i].append((row.idxmin(), row.min()))

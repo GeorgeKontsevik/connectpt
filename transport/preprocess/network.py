@@ -56,6 +56,115 @@ def roads_to_graph(roads_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame) -> 
     return roads_graph
 
 
+# def stop_complete_then_prune(
+#     G: nx.Graph,
+#     stop_flag: str = "is_stop",
+#     weight_attr: str = "mm_len",
+#     node_x: str = "x",
+#     node_y: str = "y",
+#     min_weight: float | None = None,
+#     max_weight: float | None = None,
+#     speed_kmh: float | None = None,
+#     max_hops: int | None = None,
+#     max_detour_factor: float | None = None,
+# ) -> nx.Graph:
+#     def is_stop(n):
+#         return bool(G.nodes[n].get(stop_flag, False))
+
+#     def edge_w(u, v):
+#         d = G.get_edge_data(u, v, {})
+#         return d.get(weight_attr)
+
+#     def seg_geom(u, v):
+#         d = G.get_edge_data(u, v, {}) or {}
+#         g = d.get("geometry")
+#         if g is not None:
+#             return g
+#         ux, uy = G.nodes[u].get(node_x), G.nodes[u].get(node_y)
+#         vx, vy = G.nodes[v].get(node_x), G.nodes[v].get(node_y)
+#         if None not in (ux, uy, vx, vy):
+#             return LineString([(ux, uy), (vx, vy)])
+#         return None
+
+#     stops = [n for n in G.nodes if is_stop(n)]
+#     SG = nx.Graph()
+#     if "crs" in G.graph:
+#         SG.graph["crs"] = G.graph["crs"]
+#     for s in stops:
+#         SG.add_node(s, **G.nodes[s])
+
+#     seen_paths: set[tuple] = set()
+
+#     for i, s in enumerate(stops):
+#         dist, paths = nx.single_source_dijkstra(G, s, weight=weight_attr)
+
+#         for t in stops[i + 1:]:
+#             d = dist.get(t)
+#             if d is None:
+#                 continue
+#             if min_weight is not None and d < min_weight:
+#                 continue
+#             if max_weight is not None and d > max_weight:
+#                 continue
+
+#             path = paths[t]
+#             if max_hops and len(path) - 1 > max_hops:
+#                 continue
+
+#             stop_count = sum(1 for n in path if is_stop(n))
+#             if stop_count != 2:
+#                 continue
+
+#             geoms = []
+#             total_check = 0.0
+#             path_signature = []
+#             ok = True
+
+#             for u, v in zip(path[:-1], path[1:]):
+#                 seg_key = frozenset((u, v))
+#                 path_signature.append(seg_key)
+
+#                 w = edge_w(u, v)
+#                 if w is None:
+#                     ok = False
+#                     break
+#                 total_check += w
+
+#                 g = seg_geom(u, v)
+#                 if g is not None:
+#                     geoms.append(g)
+
+#             if not ok:
+#                 continue
+
+#             signature = tuple(sorted(path_signature))
+#             if signature in seen_paths:
+#                 continue
+#             seen_paths.add(signature)
+
+#             if max_detour_factor is not None and geoms:
+#                 merged = linemerge(geoms)
+#                 if merged.length > 0:
+#                     straight = LineString([merged.coords[0], merged.coords[-1]])
+#                     if straight.length > 0 and total_check > max_detour_factor * straight.length:
+#                         continue
+
+#             attrs = {"weight": total_check, "original_path": path}
+
+#             if speed_kmh:
+#                 attrs["time_min"] = total_check * 60.0 / (1000.0 * float(speed_kmh))
+
+#             if geoms:
+#                 try:
+#                     attrs["geometry"] = linemerge(geoms)
+#                 except Exception:
+#                     pass
+
+#             SG.add_edge(s, t, **attrs)
+
+#     return nx.convert_node_labels_to_integers(SG)
+
+
 def stop_complete_then_prune(
     G: nx.Graph,
     stop_flag: str = "is_stop",
@@ -191,6 +300,7 @@ def stop_complete_then_prune(
                     pass
 
             SG.add_edge(s, t, **attrs)
+            
             simple_graph = nx.convert_node_labels_to_integers(SG)
 
     return simple_graph

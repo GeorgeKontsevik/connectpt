@@ -1,3 +1,4 @@
+from loguru import logger
 from typing import Tuple
 import pandas as pd
 import geopandas as gpd
@@ -70,6 +71,8 @@ def project_stops_on_roads(
     filtered_stops = stops_gdf.drop(stops_to_remove)
     
     if len(stops_to_remove) > 0:
-        print(f"Removed {len(stops_to_remove)} stops located farther than {max_distance} m from roads")
+        logger.warning("Removed {count} stops located farther than {max_d} m from roads",
+                    count=len(stops_to_remove),
+                    max_d=max_distance)
     
     return roads_gdf, filtered_stops.reset_index(drop=True)

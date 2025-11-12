@@ -22,6 +22,7 @@ __version__ = importlib.metadata.version("transport")
 from .types import Modality
 from .preprocess_data import preprocess
 from .od import get_OD
+from .od_multi import get_multi_OD
 
 # import importlib
 

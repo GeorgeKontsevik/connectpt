@@ -1,10 +1,11 @@
-from __future__ import annotations
-
 from typing import Dict, List, Optional
+
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import osmnx as ox
+
+from loguru import logger
 from shapely.geometry import Polygon, MultiPolygon
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
@@ -231,7 +232,7 @@ def aggregate_stops(stops_gdf: gpd.GeoDataFrame, distance_threshold: int = None)
         # Calculate automatic threshold
         median_dist = _calculate_median_distance(stops_gdf)
         distance_threshold = int(median_dist)
-        print(f"Automatically calculated distance_threshold: {distance_threshold:.2f}m")
+        logger.info(f"Automatically calculated distance_threshold: {distance_threshold:.2f}m")
 
     n_stops = len(stops_gdf)
     # Adjacency matrix initialization

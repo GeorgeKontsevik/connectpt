@@ -84,6 +84,7 @@ def preprocess(blocks : gpd.GeoDataFrame, modalities : list[Modality]) :
             roads_with_stops.loc[mask, "length_meter"] = roads_with_stops.loc[mask, "geometry"].length
 
         roads_with_stops_graph = roads_to_graph(roads_with_stops, filtered_stops)
+        # simplified_graph = stop_complete_then_prune(G = roads_with_stops_graph, speed_kmh=20, max_hops = 5, max_detour_factor=2.5, min_weight=150 )
         simplified_graph = stop_complete_then_prune(G = roads_with_stops_graph, speed_kmh=20)
         largest_cc_nodes = max(nx.connected_components(simplified_graph), key=len)  # Узлы самой большой компоненты
         simplified_graph_largest = simplified_graph.subgraph(largest_cc_nodes).copy()  # Создаем подграф
@@ -99,4 +100,4 @@ def preprocess(blocks : gpd.GeoDataFrame, modalities : list[Modality]) :
 
         result[modality] = (stops_gdf, time_matrix, simplified_graph_largest)
 
-    return result
+    return result, roads_with_stops_graph
