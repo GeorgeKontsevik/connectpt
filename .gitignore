@@ -46,3 +46,6 @@ ENV/
 # Local caches for examples
 # .examples/cache/   
 examples/cache/    
+
+examples/output_routes
+examples/training_logs
