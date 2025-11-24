@@ -39,6 +39,8 @@ from .transit_time_estimator import RouteGenBatchState, \
 from .citygraph_dataset import STOP_KEY
 from .torch_utils import load_routes_tensor
 
+from hydra import compose, initialize_config_dir
+
 
 PM_TERMSFIRST = "termsfirst"
 PM_ROUTESFIRST = "routesfirst"
@@ -445,3 +447,61 @@ def get_path_length(G, path, weight='weight'):
             length += G[u][v].get(weight, 1)
     
     return length    
+
+def get_eval_cfg(cfg_dir: str, base_cfg_name: str = "eval_model_mumford", params: dict | None = None):
+    """
+    Creates a Hydra config for model evaluation.
+
+    params — dictionary with "human-friendly" parameter names, e.g.:
+        {
+            "dataset_name": "mumford",
+            "n_routes": 12,
+            "min_route_len": 2,
+            "max_route_len": 15,
+            "demand_time_weight": 0.3,
+            "route_time_weight": 0.4,
+            "median_connectivity_weight": 0.3,
+            "run_name": "my_test_run",
+            "model_weights": "../path/to/model.pt"
+        }
+
+    The function automatically maps the keys to Hydra config paths.
+    Unknown keys are ignored.
+    """
+    if params is None:
+        params = {}
+
+    # mapping "human-friendly" keys to Hydra paths
+    key_map = {
+        "dataset_name": "+eval.dataset.type",  # добавляем новый ключ
+        "n_routes": "+eval.n_routes",          # добавляем новый ключ, если нет
+        "min_route_len": "+eval.min_route_len",
+        "max_route_len": "+eval.max_route_len",
+        "demand_time_weight": "++experiment.cost_function.kwargs.demand_time_weight",
+        "route_time_weight": "++experiment.cost_function.kwargs.route_time_weight",
+        "median_connectivity_weight": "++experiment.cost_function.kwargs.median_connectivity_weight",
+        "constraint_violation_weight": "++experiment.cost_function.kwargs.constraint_violation_weight",
+        "use_weighted_connectivity": "++experiment.cost_function.kwargs.use_weighted_connectivity",
+        "variable_weights": "++experiment.cost_function.kwargs.variable_weights",
+        "pp_fraction": "++experiment.cost_function.kwargs.pp_fraction",
+        "op_fraction": "++experiment.cost_function.kwargs.op_fraction",
+        "mcw_fraction": "++experiment.cost_function.kwargs.mcw_fraction",
+        "run_name": "++run_name",
+        "model_weights": "++model.weights",
+        "starting_routes_init": "++init.method",
+        "starting_routes_path":"++init.path"
+    }
+
+    # формируем список overrides
+    overrides = []
+    for k, v in params.items():
+        path = key_map.get(k)
+        if path:
+            overrides.append(f"{path}={v}")
+        else:
+            print(f"[Warning] Ignored unknown parameter: {k}")
+
+    with initialize_config_dir(config_dir=cfg_dir, version_base=None):
+        cfg_eval = compose(config_name=base_cfg_name, overrides=overrides)
+
+    return cfg_eval
