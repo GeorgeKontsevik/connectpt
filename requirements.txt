@@ -1,0 +1,8 @@
+-e .
+geopandas>=1.0.0,<2.0.0
+mapclassify==2.6.1
+folium==0.14.0
+matplotlib-inline==0.1.6
+ipykernel
+jupyter
+ipywidgets
