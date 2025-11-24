@@ -1,7 +1,7 @@
 n_bees: 10
 n_type1_bees: 5
-n_iterations: 400
-batch_size: 128
+n_iterations: 2
+batch_size: 2
 csv: false
 
 defaults:

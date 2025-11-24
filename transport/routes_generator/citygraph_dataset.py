@@ -41,7 +41,7 @@ from torch_geometric.transforms import KNNGraph, RemoveIsolatedNodes, \
 
 from .torch_utils import load_routes_tensor, floyd_warshall
 
-RAW_GRAPH_FILENAME = '/root/TNDP_learning/output_graphs/raw_graphs_1000.pkl'
+RAW_GRAPH_FILENAME = '/root/transport/examples/route_generator/output_graphs/raw_graphs_1000.pkl'
 
 STOP_KEY = 'stop'
 STREET_KEY = (STOP_KEY, 'street', STOP_KEY)

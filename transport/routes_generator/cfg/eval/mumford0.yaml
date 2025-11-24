@@ -4,5 +4,5 @@ min_route_len: 2
 max_route_len: 15
 dataset:
   type: mumford
-  path: ../TNDP_learning/CEC2013Supp/Instances
+  path: /root/transport/data
   city: Mumford0

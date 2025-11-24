@@ -4,7 +4,7 @@ min_route_len: 7
 max_route_len: 34
 dataset:
   type: mumford
-  path: ../TNDP_learning/CEC2013Supp/Instances
+  path: /root/transport/data
   city: Vologda
   scale_dynamically: false
   

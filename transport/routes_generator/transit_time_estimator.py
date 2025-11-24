@@ -835,8 +835,9 @@ class CostHelperOutput:
             '# disconnected node pairs': 
                 self.n_disconnected_demand_edges.float(),
             '# stops out of bounds': self.n_stops_oob.float(),
-            'median_connectivity': self.median_connectivity,
-            'median_connectivity_weighted': self.median_connectivity_weighted,
+            'median_connectivity': self.median_connectivity / 60 if self.median_connectivity is not None else None,
+            'median_connectivity_weighted': self.median_connectivity_weighted / 60 if self.median_connectivity_weighted is not None else None,
+
         }
         return metrics
 

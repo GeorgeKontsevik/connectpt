@@ -1,4 +1,4 @@
-n_samples: 50
+n_samples: 2
 batch_size: 16
 experiment:
   logdir: null
