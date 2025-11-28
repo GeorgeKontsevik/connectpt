@@ -100,4 +100,4 @@ def preprocess(blocks : gpd.GeoDataFrame, modalities : list[Modality]) :
 
         result[modality] = (stops_gdf, time_matrix, simplified_graph_largest)
 
-    return result, roads_with_stops_graph
+    return result, simplified_graph_largest

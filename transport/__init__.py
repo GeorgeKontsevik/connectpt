@@ -9,7 +9,7 @@ such as versioning, author information, and license details.
 import importlib
 
 __version__ = importlib.metadata.version("transport") # TODO поменять название в соответствии с pyproject.toml
-__author__ = "Vasilii Starikov"
-__email__ = "vasilstar97@gmail.com"
-__credits__ = []
-__license__ = "BSD-3"
+# __author__ = "Vasilii Starikov"
+# __email__ = "vasilstar97@gmail.com"
+# __credits__ = []
+# __license__ = "BSD-3"
