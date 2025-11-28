@@ -40,7 +40,7 @@ Typical usage:
 
 import importlib
 
-__version__ = importlib.metadata.version("transport")
+__version__ = importlib.metadata.version("connectpt")
 
 # === Dataset & Graph Utilities ===
 from .citygraph_dataset import (

@@ -4,7 +4,7 @@ min_route_len: 7
 max_route_len: 34
 dataset:
   type: mumford
-  path: /root/transport/data
+  path: /root/connectpt/data
   city: Vologda
   scale_dynamically: false
   

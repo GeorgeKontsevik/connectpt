@@ -4,5 +4,5 @@ min_route_len: 10
 max_route_len: 22
 dataset:
   type: mumford
-  path: /root/transport/data
+  path: /root/connectpt/data
   city: Mumford2

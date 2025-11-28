@@ -17,7 +17,7 @@ Typical usage:
 
 import importlib
 
-__version__ = importlib.metadata.version("transport")
+__version__ = importlib.metadata.version("connectpt")
 
 from .types import Modality
 from .preprocess_data import preprocess
