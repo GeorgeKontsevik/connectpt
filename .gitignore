@@ -34,6 +34,7 @@ instance/
 # Environments
 .env
 .venv/
+.venv2/
 venv/
 ENV/
 
@@ -45,4 +46,10 @@ ENV/
 
 # Local caches for examples
 # .examples/cache/   
-examples/cache/    
+examples/cache/  
+examples/data 
+cache 
+backlog_notebooks
+
+data
+.csv
