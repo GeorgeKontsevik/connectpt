@@ -42,6 +42,10 @@ data folder <./examples/data>`__.
 Examples
 --------
 
+.. image:: https://mybinder.org/badge_logo.svg
+   :target: https://mybinder.org/v2/gh/alexandermorozzov/transport.git/route_generator?urlpath=%2Fdoc%2Ftree%2Fexamples%2Froute_generator%2Fevaluation.ipynb
+   :alt: Launch Binder
+
 Next examples will help one to get used to the library:
 
 1. Main `example <./examples/my_example.ipynb>`__ of the library.
