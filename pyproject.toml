@@ -3,17 +3,19 @@ requires = ["setuptools>=64.0", "setuptools_scm[toml]>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project] # метаданные проекта
-name = "my_package" # название вашего проекта
+name = "connectpt" # название вашего проекта
 dynamic = ["version"]
 authors = [
-    { name = "Vasilii Starikov", email = "vasilstar97@gmail.com" },
+    { name = "Alexander Morozov", email = "alexandermorozzov@gmail.com" },
+    { name = "Ruslan Kozlyak", email = "rkozliak@gmail.com" },
 ] # не забудьте поменять на свое имя :)
-description = "IDU research package boilerplate"
+description = "-"
 readme = "README.rst"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { file = "LICENCE" }
 
 dependencies = [ # здесь необходимо вести все устанавливаемые зависимости: пакеты, которые необходимы для адекватной работы вашей библиотеки
+    "numpy>=2.0.0,<3.0.0",
     "geopandas>=1.0.0,<2.0.0",
 ]
 
@@ -25,7 +27,7 @@ classifiers = [ # метаданные для описания проекта п
 ]
 
 [tool.setuptools.packages.find] # что включать в сборку при установке
-include = ["my_package*"]
+include = ["connectpt*"]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"
@@ -73,7 +75,7 @@ docs = [ # зависимости, необходимые для сборки д
 # всякие истории, связанные с форматированием кода
 [tool.black]
 line-length = 120
-target-version = ['py310']
+target-version = ['py311']
 
 [tool.pylint.format]
 max-line-length = 120

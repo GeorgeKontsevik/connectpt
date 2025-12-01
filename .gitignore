@@ -34,6 +34,7 @@ instance/
 # Environments
 .env
 .venv/
+.venv2/
 venv/
 ENV/
 
@@ -42,3 +43,22 @@ ENV/
 
 # PyCharm env
 .idea
+
+# Local caches for examples
+# .examples/cache/   
+examples/cache/  
+examples/data 
+cache 
+backlog_notebooks
+
+data
+.csv
+examples/cache/    
+
+examples/output_routes
+examples/training_logs
+examples/route_generator/datasets
+examples/route_generator/experiment_results
+examples/route_generator/output_graphs
+examples/route_generator/output_routes
+examples/route_generator/training_logs
