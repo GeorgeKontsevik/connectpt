@@ -15,9 +15,7 @@ ConnectPT
 Overview
 --------
 ConnectPT is a research toolkit for building public transport networks and generating route plans. It combines preprocessing utilities for stop-level graphs with optimization and learning-based route generators.
-The tool is based on the transit_learning project, which has been modified. Improvements include the addition of a transport-weighted connectivity metric for route generation. In the future, we plan to adapt the generation process to urban planning implementations. 
-
-.. _transit_learning:  https://github.com/AHolliday/transit_learning/tree/master
+The tool is based on the `transit_learning <https://github.com/AHolliday/transit_learning/tree/master>`__ project, which has been modified. Improvements include the addition of a transport-weighted connectivity metric for route generation. In the future, we plan to adapt the generation process to urban planning implementations. 
 
 Installation
 ------------

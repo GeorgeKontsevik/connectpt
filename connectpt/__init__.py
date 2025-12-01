@@ -1,10 +1,10 @@
-"""
-Python package boilerplate for IDU.
+# """
+# Python package boilerplate for IDU.
 
-This package serves as a boilerplate for developing Python packages
-for Institute of Design and Urban Studies (IDU). It includes basic metadata
-such as versioning, author information, and license details.
-"""
+# This package serves as a boilerplate for developing Python packages
+# for Institute of Design and Urban Studies (IDU). It includes basic metadata
+# such as versioning, author information, and license details.
+# """
 
 import importlib
 
