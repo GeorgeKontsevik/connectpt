@@ -3,36 +3,29 @@ ConnectPT
 
 .. logo-start
 
+.. figure:: https://psv4.userapi.com/s/v1/d2/aE8kEC2MYzxzxQgGbG4SIXKijfv-ouCe9jNMag7ONZ8TdctZo5IKBe-MR2OTRxVEWMIaq7yxqnPSpyKEK4HMDw_yf5_XLgYa-7MQxgABQBIUzMCtFT7G5FsrWZN7GbfnTQUP-1X-NSqK/connectpt_logo_gen_gpt_v4.png
+   :alt: ConnectPT
+
 .. logo-end
 
-|PythonVersion| |LicenseBadge|
+|PythonVersion|
 
 .. readme-start 
 
 Overview
 --------
-ConnectPT is a research toolkit for building public transport networks and generating route plans. It combines preprocessing utilities for stop-level graphs with optimization and learning-based route generators derived from the Transit Learning project.
-
-Features
---------
-- End-to-end preprocessing pipeline (`connectpt.preprocess`) that downloads stops/lines by modality, projects them onto road networks, and returns stop coordinates plus stop-to-stop time matrices.
-- Route-generation stack (`connectpt.routes_generator`) with Bee Colony Optimization, path-combining neural models, PPO/REINFORCE-style training loops, and evaluation helpers.
-- Config-driven experiments with Hydra/OmegaConf; ready-to-use configs live in `connectpt/routes_generator/cfg/`.
-- Benchmark scenarios (Mandl, Mumford) and cached datasets for quick experiments in `data/` and `examples/cache/`.
-- Jupyter notebooks demonstrating preprocessing and route generation in `examples/`.
+ConnectPT is a research toolkit for building public transport networks and generating route plans. It combines preprocessing utilities for stop-level graphs with optimization and learning-based route generators.
 
 Installation
 ------------
-Python 3.11+ is required. Install PyTorch and torch-geometric suitable for your platform, then install ConnectPT:
+The library can be installed with ``pip``:
 
-.. code-block:: bash
+::
 
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -e .               # library only
-   pip install -e .[dev,tests,docs]  # optional extras
+   pip install git+https://github.com/alexandermorozzov/connectpt@main
 
-Quickstart
+
+How to use
 ----------
 Preprocess public transport data for selected modes:
 
@@ -41,7 +34,7 @@ Preprocess public transport data for selected modes:
    import geopandas as gpd
    from connectpt.preprocess import preprocess, Modality
 
-   blocks = gpd.read_file("path/to/blocks.geojson")
+   blocks = gpd.read_file("path/to/blocks.geojson") # City blocks are obtained via BlocksNet library
    result, graph = preprocess(blocks, [Modality.BUS])
    stops_gdf, time_matrix, stop_graph = result[Modality.BUS]
 
@@ -72,38 +65,18 @@ For neural route generators, see `examples/route_generator/experiment.ipynb` and
 
 Data and Examples
 -----------------
-- Benchmark graphs and demand matrices: `data/` (Mandl, Mumford, blocks/graphs/routes).
-- Notebooks for preprocessing and route generation: `examples/preprocess/` and `examples/route_generator/`.
-- Cached datasets for quick experimentation: `examples/cache/`.
+Benchmark data for evaluation – graphs and demand matrices: `data/` (Mandl, Mumford, blocks/graphs/routes).
 
-Project Structure
------------------
-- `connectpt/preprocess`: stop/line preprocessing, OD/time matrices, modality handling.
-- `connectpt/routes_generator`: datasets, cost modules, optimization methods (BCO, RL), and evaluation utilities; configs in `cfg/`.
-- `data`: small benchmark scenarios used in examples/tests.
-- `examples`: runnable notebooks for preprocessing and training/evaluation.
-- `docs`: Sphinx sources (includes this README).
-- `tests`: minimal tests for core components.
-
-Development
------------
-- Run tests: `pytest`.
-- Format/lint: `black . && isort .`.
-- Build docs: `sphinx-build -b html docs/source docs/build`.
-
-License
--------
-BSD-3-Clause (see `LICENSE`). Route-generation components are adapted from the Transit Learning project by Andrew Holliday (GPLv3 in upstream); retain notices when redistributing.
-
-Contacts
---------
+You can contact us:
+-------------------
 - Alexander Morozov — alexandermorozzov@gmail.com
 - Ruslan Kozlyak — rkozliak@gmail.com
+
+Acknowledgments:
+----------------
+This work supported by the Ministry of Economic Development of the Russian Federation (IGK 000000C313925P4C0002), agreement No139-15-2025-010
 
 .. readme-end
 
 .. |PythonVersion| image:: https://img.shields.io/badge/python-3.11+-blue
    :target: https://www.python.org/
-
-.. |LicenseBadge| image:: https://img.shields.io/badge/license-BSD--3--Clause-green
-   :target: LICENSE
