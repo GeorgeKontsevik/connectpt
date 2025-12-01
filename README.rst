@@ -1,117 +1,109 @@
-Python package boilerplate (IDU) 
-================================
+ConnectPT
+=========
 
 .. logo-start
 
-.. figure:: https://sun9-46.userapi.com/impf/aUFBStH0x_6jN9UhgwrKN1WN4hZ9Y2HMMrXT2w/NuzVobaGlZ0.jpg?size=1590x400&quality=95&crop=0,0,1878,472&sign=9d33baa41a86de35d951d4bbd8011994&type=cover_group
-   :alt: The Institute of Design and Urban Studies
-
 .. logo-end
 
-|Documentation Status| |PythonVersion| |Black|
+|PythonVersion| |LicenseBadge|
 
 .. readme-start 
 
+Overview
+--------
+ConnectPT is a research toolkit for building public transport networks and generating route plans. It combines preprocessing utilities for stop-level graphs with optimization and learning-based route generators derived from the Transit Learning project.
+
+Features
+--------
+- End-to-end preprocessing pipeline (`connectpt.preprocess`) that downloads stops/lines by modality, projects them onto road networks, and returns stop coordinates plus stop-to-stop time matrices.
+- Route-generation stack (`connectpt.routes_generator`) with Bee Colony Optimization, path-combining neural models, PPO/REINFORCE-style training loops, and evaluation helpers.
+- Config-driven experiments with Hydra/OmegaConf; ready-to-use configs live in `connectpt/routes_generator/cfg/`.
+- Benchmark scenarios (Mandl, Mumford) and cached datasets for quick experiments in `data/` and `examples/cache/`.
+- Jupyter notebooks demonstrating preprocessing and route generation in `examples/`.
+
 Installation
 ------------
+Python 3.11+ is required. Install PyTorch and torch-geometric suitable for your platform, then install ConnectPT:
 
-The library can be installed with ``pip``:
+.. code-block:: bash
 
-::
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -e .               # library only
+   pip install -e .[dev,tests,docs]  # optional extras
 
-   pip install git+https://github.com/vasilstar97/python-package-boilerplate@main
-
-
-How to use
+Quickstart
 ----------
+Preprocess public transport data for selected modes:
 
-Use the library by importing classes from ``my_package``:
+.. code-block:: python
 
-::
+   import geopandas as gpd
+   from connectpt.preprocess import preprocess, Modality
 
-   from my_package.my_module_1 import MyClass
+   blocks = gpd.read_file("path/to/blocks.geojson")
+   result, graph = preprocess(blocks, [Modality.BUS])
+   stops_gdf, time_matrix, stop_graph = result[Modality.BUS]
 
-For more detailed use case see our `examples <#examples>`__.
+Generate and evaluate routes with Bee Colony Optimization using a provided config:
 
-Data
-----
+.. code-block:: python
 
-All the required data is stored in `examples
-data folder <./examples/data>`__.
+   from omegaconf import OmegaConf
+   from connectpt.routes_generator import (
+       RouteGenBatchState,
+       bee_colony,
+       get_cost_module_from_cfg,
+       get_dataset_from_config,
+       init_from_cfg,
+   )
 
-Examples
---------
+   cfg = OmegaConf.load("connectpt/routes_generator/cfg/bco_mumford.yaml")
+   dataset = get_dataset_from_config(cfg.data)
+   batch = dataset[:1]
+   cost = get_cost_module_from_cfg(cfg.cost)
+   state = RouteGenBatchState(batch, cost, n_routes_to_plan=cfg.experiment.n_routes)
+   init_routes = init_from_cfg(state, cfg.init)
+   best = bee_colony(state, cost, init_routes, n_bees=cfg.experiment.n_bees)
 
-.. image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/alexandermorozzov/transport.git/route_generator?urlpath=%2Fdoc%2Ftree%2Fexamples%2Froute_generator%2Fevaluation.ipynb
-   :alt: Launch Binder
+   print(best.shape)  # batch_size x n_routes x max_nodes
 
-Next examples will help one to get used to the library:
+For neural route generators, see `examples/route_generator/experiment.ipynb` and configs under `connectpt/routes_generator/cfg/`.
 
-1. Main `example <./examples/my_example.ipynb>`__ of the library.
-2. ...
-
-Documentation
--------------
-
-Detailed information and description of the library is available in
-`documentation <https://vasilstar97.github.io/python-package-boilerplate/>`__.
+Data and Examples
+-----------------
+- Benchmark graphs and demand matrices: `data/` (Mandl, Mumford, blocks/graphs/routes).
+- Notebooks for preprocessing and route generation: `examples/preprocess/` and `examples/route_generator/`.
+- Cached datasets for quick experimentation: `examples/cache/`.
 
 Project Structure
 -----------------
+- `connectpt/preprocess`: stop/line preprocessing, OD/time matrices, modality handling.
+- `connectpt/routes_generator`: datasets, cost modules, optimization methods (BCO, RL), and evaluation utilities; configs in `cfg/`.
+- `data`: small benchmark scenarios used in examples/tests.
+- `examples`: runnable notebooks for preprocessing and training/evaluation.
+- `docs`: Sphinx sources (includes this README).
+- `tests`: minimal tests for core components.
 
-The latest version of the library is available in the ``main`` branch.
-
-The repository includes the following directories and modules:
-
--  `my_package <./my_package>`__
-   directory with the library code:
-
-   -  ...
-   -  ...
-
--  `tests <./tests>`__
-   ``pytest`` testing
--  `examples <./examples>`__
-   examples of how the library works
--  `docs <./docs>`__
-   documentation sources
-
-Developing
-----------
-
-...
+Development
+-----------
+- Run tests: `pytest`.
+- Format/lint: `black . && isort .`.
+- Build docs: `sphinx-build -b html docs/source docs/build`.
 
 License
 -------
-
-The project has `BSD-3-Clause license <./LICENSE>`__
-
-Acknowledgments
----------------
-
-...
+BSD-3-Clause (see `LICENSE`). Route-generation components are adapted from the Transit Learning project by Andrew Holliday (GPLv3 in upstream); retain notices when redistributing.
 
 Contacts
 --------
-
-You can contact me:
-
--  `Vasilii Starikov <https://t.me/vasilstar>`__ - assistant
-
-Also, you are welcomed to the `issues <./issues>`__ section!
-
-Publications
-------------
-
--  `My publication name from scholar or something <https://scholar.google.com/>`__
--  ...
-
-.. |Documentation Status| image:: https://github.com/vasilstar97/python-package-boilerplate/actions/workflows/documentation.yml/badge.svg?branch=main
-   :target: https://vasilstar97.github.io/python-package-boilerplate/
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.10-blue
-   :target: https://pypi.org/project/geopandas/
-.. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
-   :target: https://github.com/psf/black
+- Alexander Morozov — alexandermorozzov@gmail.com
+- Ruslan Kozlyak — rkozliak@gmail.com
 
 .. readme-end
+
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.11+-blue
+   :target: https://www.python.org/
+
+.. |LicenseBadge| image:: https://img.shields.io/badge/license-BSD--3--Clause-green
+   :target: LICENSE
