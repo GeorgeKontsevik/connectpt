@@ -200,6 +200,9 @@ class RouteGenBatchState:
             else:
                 extra_data.fixed_routes = torch.zeros(0)
 
+            if hasattr(graph_data[STOP_KEY], 'pos'):
+                extra_data.node_coords = graph_data[STOP_KEY].pos
+
         self.extra_data = Batch.from_data_list(extra_datas)
 
         # this initializes route data
@@ -1021,7 +1024,7 @@ class CostModule(torch.nn.Module):
 class MyCostModule(CostModule):
     def __init__(self, mean_stop_time_s=MEAN_STOP_TIME_S, 
                  avg_transfer_wait_time_s=AVG_TRANSFER_WAIT_TIME_S,
-                 symmetric_routes=True, low_memory_mode=False, use_weighted_connectivity=False,
+                 symmetric_routes=True, low_memory_mode=False, use_weighted_connectivity=False, add_detour_penalty=False,
                  demand_time_weight=0.33, route_time_weight=0.33,
                  median_connectivity_weight=0.33,
                  constraint_violation_weight=5, variable_weights=False,
@@ -1030,6 +1033,7 @@ class MyCostModule(CostModule):
         super().__init__(mean_stop_time_s, avg_transfer_wait_time_s,
                          symmetric_routes, low_memory_mode)
         self.use_weighted_connectivity = use_weighted_connectivity
+        self.add_detour_penalty = add_detour_penalty
         self.demand_time_weight = demand_time_weight
         self.route_time_weight = route_time_weight
         self.median_connectivity_weight = median_connectivity_weight
@@ -1112,6 +1116,60 @@ class MyCostModule(CostModule):
         if constraint_violation_weight is not None:
             self.constraint_violation_weight = constraint_violation_weight
 
+    def calculate_detour_index_vectorized(self, state):
+        """
+        Векторизованный расчет detour index.
+        """
+        # Получаем все маршруты в виде тензора
+        batch_routes = tu.get_batch_tensor_from_routes(state.routes, state.device)
+        B, R, L = batch_routes.shape  # Batch, Routes, MaxLength
+        
+        # Создаем маску для валидных остановок
+        valid_mask = batch_routes != -1
+        
+        # Получаем координаты для всех узлов
+        # coords shape: [B, N, 2] где N = max_n_nodes
+        coords = state.extra_data.node_coords
+        
+        # Инициализируем тензор для detour indices
+        detour_indices = torch.ones((B, R), device=state.device)
+        
+        for b in range(B):
+            for r in range(R):
+                route_nodes = batch_routes[b, r]
+                mask = valid_mask[b, r]
+                
+                if mask.sum() < 2:
+                    continue  # пропускаем короткие маршруты
+                
+                # Получаем индексы валидных узлов
+                valid_indices = route_nodes[mask].long()
+                
+                # Начальная и конечная точки
+                start_idx = valid_indices[0]
+                end_idx = valid_indices[-1]
+                
+                start_coord = coords[b, start_idx]
+                end_coord = coords[b, end_idx]
+                
+                # Прямое расстояние
+                direct_dist = torch.norm(end_coord - start_coord)
+                
+                # Сумма длин ребер
+                route_coords = coords[b, valid_indices]
+                edge_vectors = route_coords[1:] - route_coords[:-1]
+                edge_lengths = torch.norm(edge_vectors, dim=1)
+                route_length = edge_lengths.sum()
+                
+                if route_length > 0:
+                    detour_idx = direct_dist / route_length
+                    detour_indices[b, r] = torch.clamp(detour_idx, 0.0, 1.0)
+        
+        # Средний detour index по маршрутам в каждом батче
+        mean_detour_indices = detour_indices.mean(dim=1)
+        
+        return mean_detour_indices
+
     def forward(self, state, constraint_weight=None, no_norm=False, 
                 return_per_route_riders=False):
         cho = self._cost_helper(state, return_per_route_riders)
@@ -1173,6 +1231,9 @@ class MyCostModule(CostModule):
         else:
             median_connectivity = cho.median_connectivity
 
+        detour_index = self.calculate_detour_index_vectorized(state)
+        detour_penalty = 1.0 - detour_index  # чем меньше detour_index, тем больше штраф
+
         # average trip time, total route time, and trips-at-n-transfers
         if not no_norm:
             # normalize cost components
@@ -1201,6 +1262,8 @@ class MyCostModule(CostModule):
             const_viol_cost += frac_stops_oob + 0.1 * (frac_stops_oob > 0)
 
         cost += const_viol_cost * constraint_weight
+        if self.add_detour_penalty:
+            cost += detour_penalty * 10
         cho.cost = cost
 
         assert cost.isfinite().all(), "invalid cost was computed!"
