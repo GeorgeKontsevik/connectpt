@@ -816,6 +816,9 @@ class CostHelperOutput:
     cost: Optional[Tensor] = None
     median_connectivity: Optional[Tensor] = None
     median_connectivity_weighted: Optional[Tensor] = None
+    detour_penalty: Optional[Tensor] = None
+
+
 
     @property
     def mean_demand_time(self):
@@ -840,6 +843,7 @@ class CostHelperOutput:
             '# stops out of bounds': self.n_stops_oob.float(),
             'median_connectivity': self.median_connectivity / 60 if self.median_connectivity is not None else None,
             'median_connectivity_weighted': self.median_connectivity_weighted / 60 if self.median_connectivity_weighted is not None else None,
+            'detour_penalty': self.detour_penalty
 
         }
         return metrics
@@ -987,6 +991,10 @@ class CostModule(torch.nn.Module):
 
         unserved_demand_matrix = demand_matrix * nopath
 
+        detour_index = self.calculate_detour_index_vectorized(state)
+        detour_penalty = 1.0 - detour_index  # чем меньше detour_index, тем больше штраф
+
+
         output = CostHelperOutput(
             total_dmd_time, state.total_route_time, trips_at_transfers, 
             total_demand, unserved_demand, total_transfers, trip_times,
@@ -994,7 +1002,8 @@ class CostModule(torch.nn.Module):
             n_duplicate_stops, batch_routes,
             unserved_demand_matrix, 
             median_connectivity=median_connectivity,
-            median_connectivity_weighted=median_connectivity_weighted
+            median_connectivity_weighted=median_connectivity_weighted,
+            detour_penalty=detour_penalty
         )
 
         if return_per_route_riders:
@@ -1231,15 +1240,13 @@ class MyCostModule(CostModule):
         else:
             median_connectivity = cho.median_connectivity
 
-        detour_index = self.calculate_detour_index_vectorized(state)
-        detour_penalty = 1.0 - detour_index  # чем меньше detour_index, тем больше штраф
-
         # average trip time, total route time, and trips-at-n-transfers
         if not no_norm:
             # normalize cost components
             demand_cost = demand_cost / time_normalizer
             route_cost = route_cost / (time_normalizer * n_routes + 1e-6)
             median_connectivity =  median_connectivity/ (time_normalizer)
+
             # cho.median_connectivity = median_connectivity
         # new reward function
         cost = demand_cost * demand_time_weight + \
@@ -1263,7 +1270,7 @@ class MyCostModule(CostModule):
 
         cost += const_viol_cost * constraint_weight
         if self.add_detour_penalty:
-            cost += detour_penalty * 10
+            cost += cho.detour_penalty
         cho.cost = cost
 
         assert cost.isfinite().all(), "invalid cost was computed!"
