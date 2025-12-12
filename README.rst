@@ -1,117 +1,86 @@
-Python package boilerplate (IDU) 
-================================
+ConnectPT
+=========
 
 .. logo-start
 
-.. figure:: https://sun9-46.userapi.com/impf/aUFBStH0x_6jN9UhgwrKN1WN4hZ9Y2HMMrXT2w/NuzVobaGlZ0.jpg?size=1590x400&quality=95&crop=0,0,1878,472&sign=9d33baa41a86de35d951d4bbd8011994&type=cover_group
-   :alt: The Institute of Design and Urban Studies
+.. figure:: https://psv4.userapi.com/s/v1/d2/aE8kEC2MYzxzxQgGbG4SIXKijfv-ouCe9jNMag7ONZ8TdctZo5IKBe-MR2OTRxVEWMIaq7yxqnPSpyKEK4HMDw_yf5_XLgYa-7MQxgABQBIUzMCtFT7G5FsrWZN7GbfnTQUP-1X-NSqK/connectpt_logo_gen_gpt_v4.png
+   :alt: ConnectPT
 
 .. logo-end
 
-|Documentation Status| |PythonVersion| |Black|
+|PythonVersion|
 
 .. readme-start 
 
+Overview
+--------
+ConnectPT is a research toolkit for building public transport networks and generating route plans. It combines preprocessing utilities for stop-level graphs with optimization and learning-based route generators.
+The tool is based on the `transit_learning <https://github.com/AHolliday/transit_learning/tree/master>`__ project, which has been modified. Improvements include the addition of a transport-weighted connectivity metric for route generation. In the future, we plan to adapt the generation process to urban planning implementations. 
+
 Installation
 ------------
-
 The library can be installed with ``pip``:
 
 ::
 
-   pip install git+https://github.com/vasilstar97/python-package-boilerplate@main
+   pip install git+https://github.com/alexandermorozzov/connectpt@main
 
 
 How to use
 ----------
+Preprocess public transport data for selected modes:
 
-Use the library by importing classes from ``my_package``:
+.. code-block:: python
 
-::
+   import geopandas as gpd
+   from connectpt.preprocess import preprocess, Modality
 
-   from my_package.my_module_1 import MyClass
+   blocks = gpd.read_file("path/to/blocks.geojson") # City blocks are obtained via BlocksNet library
+   result, graph = preprocess(blocks, [Modality.BUS])
+   stops_gdf, time_matrix, stop_graph = result[Modality.BUS]
 
-For more detailed use case see our `examples <#examples>`__.
+Generate and evaluate routes with Bee Colony Optimization using a provided config:
 
-Data
-----
+.. code-block:: python
 
-All the required data is stored in `examples
-data folder <./examples/data>`__.
+   from omegaconf import OmegaConf
+   from connectpt.routes_generator import (
+       RouteGenBatchState,
+       bee_colony,
+       get_cost_module_from_cfg,
+       get_dataset_from_config,
+       init_from_cfg,
+   )
 
-Examples
---------
+   cfg = OmegaConf.load("connectpt/routes_generator/cfg/bco_mumford.yaml")
+   dataset = get_dataset_from_config(cfg.data)
+   batch = dataset[:1]
+   cost = get_cost_module_from_cfg(cfg.cost)
+   state = RouteGenBatchState(batch, cost, n_routes_to_plan=cfg.experiment.n_routes)
+   init_routes = init_from_cfg(state, cfg.init)
+   best = bee_colony(state, cost, init_routes, n_bees=cfg.experiment.n_bees)
 
-.. image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/alexandermorozzov/transport.git/route_generator?urlpath=%2Fdoc%2Ftree%2Fexamples%2Froute_generator%2Fevaluation.ipynb
-   :alt: Launch Binder
+   print(best.shape)  # batch_size x n_routes x max_nodes
 
-Next examples will help one to get used to the library:
+For neural route generators, see `examples/route_generator/experiment.ipynb` and configs under `connectpt/routes_generator/cfg/`.
 
-1. Main `example <./examples/my_example.ipynb>`__ of the library.
-2. ...
-
-Documentation
--------------
-
-Detailed information and description of the library is available in
-`documentation <https://vasilstar97.github.io/python-package-boilerplate/>`__.
-
-Project Structure
+Data and Examples
 -----------------
+Benchmark data for evaluation – graphs and demand matrices: `data/` (Mandl, Mumford, blocks/graphs/routes).
 
-The latest version of the library is available in the ``main`` branch.
+You can contact us:
+-------------------
+- Alexander Morozov — alexandermorozzov@gmail.com
+- Ruslan Kozlyak — rkozliak@gmail.com
 
-The repository includes the following directories and modules:
+Acknowledgments:
+----------------
+This work supported by the Ministry of Economic Development of the Russian Federation (IGK 000000C313925P4C0002), agreement No139-15-2025-010.
 
--  `my_package <./my_package>`__
-   directory with the library code:
 
-   -  ...
-   -  ...
 
--  `tests <./tests>`__
-   ``pytest`` testing
--  `examples <./examples>`__
-   examples of how the library works
--  `docs <./docs>`__
-   documentation sources
-
-Developing
-----------
-
-...
-
-License
--------
-
-The project has `BSD-3-Clause license <./LICENSE>`__
-
-Acknowledgments
----------------
-
-...
-
-Contacts
---------
-
-You can contact me:
-
--  `Vasilii Starikov <https://t.me/vasilstar>`__ - assistant
-
-Also, you are welcomed to the `issues <./issues>`__ section!
-
-Publications
-------------
-
--  `My publication name from scholar or something <https://scholar.google.com/>`__
--  ...
-
-.. |Documentation Status| image:: https://github.com/vasilstar97/python-package-boilerplate/actions/workflows/documentation.yml/badge.svg?branch=main
-   :target: https://vasilstar97.github.io/python-package-boilerplate/
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.10-blue
-   :target: https://pypi.org/project/geopandas/
-.. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
-   :target: https://github.com/psf/black
 
 .. readme-end
+
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.11+-blue
+   :target: https://www.python.org/

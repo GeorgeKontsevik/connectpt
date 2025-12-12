@@ -1,5 +1,5 @@
 import pytest
-from transport.my_module import my_function
+from connectpt.my_module import my_function
 
 @pytest.fixture
 def a():
