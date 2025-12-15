@@ -465,6 +465,7 @@ def get_eval_cfg(cfg_dir: str, base_cfg_name: str = "eval_model_mumford", params
         "median_connectivity_weight": "++experiment.cost_function.kwargs.median_connectivity_weight",
         "constraint_violation_weight": "++experiment.cost_function.kwargs.constraint_violation_weight",
         "use_weighted_connectivity": "++experiment.cost_function.kwargs.use_weighted_connectivity",
+        "add_detour_penalty": "++experiment.cost_function.kwargs.add_detour_penalty",
         "variable_weights": "++experiment.cost_function.kwargs.variable_weights",
         "pp_fraction": "++experiment.cost_function.kwargs.pp_fraction",
         "op_fraction": "++experiment.cost_function.kwargs.op_fraction",

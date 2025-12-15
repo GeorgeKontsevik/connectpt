@@ -183,6 +183,9 @@ class RouteGenBatchState:
             else:
                 extra_data.fixed_routes = torch.zeros(0)
 
+            if hasattr(graph_data[STOP_KEY], 'pos'):
+                extra_data.node_coords = graph_data[STOP_KEY].pos
+
         self.extra_data = Batch.from_data_list(extra_datas)
 
         # this initializes route data
@@ -792,10 +795,15 @@ class CostHelperOutput:
     n_duplicate_stops: Tensor
     batch_routes: Tensor
     unserved_demand_matrix: Tensor 
+    route_cost: Optional[Tensor] = None
+    demand_cost: Optional[Tensor] = None
+
     per_route_riders: Optional[Tensor] = None
     cost: Optional[Tensor] = None
     median_connectivity: Optional[Tensor] = None
     median_connectivity_weighted: Optional[Tensor] = None
+    detour_penalty: Optional[Tensor] = None
+
 
     @property
     def mean_demand_time(self):
@@ -820,7 +828,9 @@ class CostHelperOutput:
             '# stops out of bounds': self.n_stops_oob.float(),
             'median_connectivity': self.median_connectivity / 60 if self.median_connectivity is not None else None,
             'median_connectivity_weighted': self.median_connectivity_weighted / 60 if self.median_connectivity_weighted is not None else None,
-
+            'detour_penalty': self.detour_penalty,
+            'route_cost': self.route_cost,
+            'demand_cost': self.demand_cost
         }
         return metrics
 
@@ -967,6 +977,10 @@ class CostModule(torch.nn.Module):
 
         unserved_demand_matrix = demand_matrix * nopath
 
+        detour_index = self.calculate_detour_index_vectorized(state)
+        detour_penalty = 1.0 - detour_index  # чем меньше detour_index, тем больше штраф
+
+
         output = CostHelperOutput(
             total_dmd_time, state.total_route_time, trips_at_transfers, 
             total_demand, unserved_demand, total_transfers, trip_times,
@@ -974,7 +988,8 @@ class CostModule(torch.nn.Module):
             n_duplicate_stops, batch_routes,
             unserved_demand_matrix, 
             median_connectivity=median_connectivity,
-            median_connectivity_weighted=median_connectivity_weighted
+            median_connectivity_weighted=median_connectivity_weighted,
+            detour_penalty=detour_penalty,
         )
 
         if return_per_route_riders:
@@ -1004,7 +1019,7 @@ class CostModule(torch.nn.Module):
 class MyCostModule(CostModule):
     def __init__(self, mean_stop_time_s=MEAN_STOP_TIME_S, 
                  avg_transfer_wait_time_s=AVG_TRANSFER_WAIT_TIME_S,
-                 symmetric_routes=True, low_memory_mode=False, use_weighted_connectivity=False,
+                 symmetric_routes=True, low_memory_mode=False, use_weighted_connectivity=False, add_detour_penalty=False,
                  demand_time_weight=0.33, route_time_weight=0.33,
                  median_connectivity_weight=0.33,
                  constraint_violation_weight=5, variable_weights=False,
@@ -1013,6 +1028,7 @@ class MyCostModule(CostModule):
         super().__init__(mean_stop_time_s, avg_transfer_wait_time_s,
                          symmetric_routes, low_memory_mode)
         self.use_weighted_connectivity = use_weighted_connectivity
+        self.add_detour_penalty = add_detour_penalty
         self.demand_time_weight = demand_time_weight
         self.route_time_weight = route_time_weight
         self.median_connectivity_weight = median_connectivity_weight
@@ -1095,6 +1111,115 @@ class MyCostModule(CostModule):
         if constraint_violation_weight is not None:
             self.constraint_violation_weight = constraint_violation_weight
 
+    def calculate_detour_index_vectorized(self, state, segment_len=5):
+        """
+        Вычисляет detour index по сегментам для каждого маршрута.
+        segment_len — количество остановок в одном сегменте.
+        """
+        batch_routes = tu.get_batch_tensor_from_routes(state.routes, state.device)
+        B, R, L = batch_routes.shape  
+        coords = state.extra_data.node_coords
+        detour_scores = torch.zeros((B, R), device=state.device)
+
+        for b in range(B):
+            for r in range(R):
+                route = batch_routes[b, r]
+                valid = route[route >= 0].long()
+                n = len(valid)
+                if n < 3:
+                    continue
+                
+                route_coords = coords[b, valid]
+                local_scores = []
+
+                # проход по сегментам
+                for i in range(0, n - segment_len, segment_len - 1):
+                    seg_nodes = valid[i: i + segment_len]
+                    if len(seg_nodes) < 2:
+                        continue
+
+                    seg_coords = coords[b, seg_nodes]
+
+                    # прямая линия сегмента
+                    direct = torch.norm(seg_coords[-1] - seg_coords[0])
+
+                    # длина по ребрам сегмента
+                    edges = seg_coords[1:] - seg_coords[:-1]
+                    route_len = torch.norm(edges, dim=1).sum()
+
+                    if route_len > 0:
+                        local_scores.append(direct / route_len)
+
+                if len(local_scores) == 0:
+                    continue
+                
+                local_scores_t = torch.tensor(local_scores, device=state.device)
+                mean_det = local_scores_t.mean()
+                # безопасная версия std
+                if len(local_scores_t) == 1:
+                    std_det = torch.tensor(0.0, device=state.device)
+                else:
+                    std_det = torch.nan_to_num(local_scores_t.std(), nan=0.0)
+
+                # penalty: поощряет прямые участки и однородность сегментов
+                detour_scores[b, r] = mean_det - 0.2 * std_det
+
+        # нормируем
+        detour_scores = torch.clamp(detour_scores, 0.0, 1.0)
+        return detour_scores.mean(dim=1)
+        # """
+        # Векторизованный расчет detour index.
+        # """
+        # # Получаем все маршруты в виде тензора
+        # batch_routes = tu.get_batch_tensor_from_routes(state.routes, state.device)
+        # B, R, L = batch_routes.shape  # Batch, Routes, MaxLength
+        
+        # # Создаем маску для валидных остановок
+        # valid_mask = batch_routes != -1
+        
+        # # Получаем координаты для всех узлов
+        # # coords shape: [B, N, 2] где N = max_n_nodes
+        # coords = state.extra_data.node_coords
+        
+        # # Инициализируем тензор для detour indices
+        # detour_indices = torch.ones((B, R), device=state.device)
+        
+        # for b in range(B):
+        #     for r in range(R):
+        #         route_nodes = batch_routes[b, r]
+        #         mask = valid_mask[b, r]
+                
+        #         if mask.sum() < 2:
+        #             continue  # пропускаем короткие маршруты
+                
+        #         # Получаем индексы валидных узлов
+        #         valid_indices = route_nodes[mask].long()
+                
+        #         # Начальная и конечная точки
+        #         start_idx = valid_indices[0]
+        #         end_idx = valid_indices[-1]
+                
+        #         start_coord = coords[b, start_idx]
+        #         end_coord = coords[b, end_idx]
+                
+        #         # Прямое расстояние
+        #         direct_dist = torch.norm(end_coord - start_coord)
+                
+        #         # Сумма длин ребер
+        #         route_coords = coords[b, valid_indices]
+        #         edge_vectors = route_coords[1:] - route_coords[:-1]
+        #         edge_lengths = torch.norm(edge_vectors, dim=1)
+        #         route_length = edge_lengths.sum()
+                
+        #         if route_length > 0:
+        #             detour_idx = direct_dist / route_length
+        #             detour_indices[b, r] = torch.clamp(detour_idx, 0.0, 1.0)
+        
+        # # Средний detour index по маршрутам в каждом батче
+        # mean_detour_indices = detour_indices.mean(dim=1)
+        
+        # return mean_detour_indices
+
     def forward(self, state, constraint_weight=None, no_norm=False, 
                 return_per_route_riders=False):
         cho = self._cost_helper(state, return_per_route_riders)
@@ -1162,6 +1287,11 @@ class MyCostModule(CostModule):
             demand_cost = demand_cost / time_normalizer
             route_cost = route_cost / (time_normalizer * n_routes + 1e-6)
             median_connectivity =  median_connectivity/ (time_normalizer)
+
+            cho.demand_cost = demand_cost
+            cho.route_cost = route_cost
+            cho.median_connectivity = median_connectivity
+
             # cho.median_connectivity = median_connectivity
         # new reward function
         cost = demand_cost * demand_time_weight + \
@@ -1184,6 +1314,10 @@ class MyCostModule(CostModule):
             const_viol_cost += frac_stops_oob + 0.1 * (frac_stops_oob > 0)
 
         cost += const_viol_cost * constraint_weight
+        if self.add_detour_penalty:
+            coef = 30
+            cost += cho.detour_penalty * coef
+            cho.detour_penalty *=coef
         cho.cost = cost
 
         assert cost.isfinite().all(), "invalid cost was computed!"
