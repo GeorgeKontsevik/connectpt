@@ -69,7 +69,7 @@ class ExtraStateData(HeteroData):
 
 
 class RouteGenBatchState:
-    def __init__(self, graph_data, cost_obj, n_routes_to_plan, min_route_len=2,
+    def __init__(self, graph_data, cost_obj, n_routes_to_plan, min_route_len=None,
                  max_route_len=None, valid_terms_mat=None, cost_weights=None):
         # do initialization needed to make properties work
         if not isinstance(graph_data, Batch):
@@ -107,6 +107,9 @@ class RouteGenBatchState:
             n_routes_to_plan = torch.tensor(n_routes_to_plan, device=dev)
         if n_routes_to_plan.numel() == 1:
             n_routes_to_plan = n_routes_to_plan.expand(graph_data.num_graphs)
+
+        if min_route_len is None:
+            min_route_len = 0
 
         extra_datas = []
         transit_times = (1 - torch.eye(max_n_nodes, device=self.device))
@@ -245,12 +248,10 @@ class RouteGenBatchState:
             if not planning_already_done[bi] and routes_are_done[bi]:
                 route = updated_routes[bi]
                 route = route.clone()[route > -1]
-                if len(route) > 0:
-                    # the route is valid, so add it to the finished set
-                     # otherwise, corresponds to a "no-op" route
-                    self._finished_routes[bi].append(route)
-                    self.extra_data.total_route_time[bi] += \
-                        self.current_route_time[bi]
+                # empty routes are allowed and count toward the plan
+                self._finished_routes[bi].append(route)
+                self.extra_data.total_route_time[bi] += \
+                    self.current_route_time[bi]
             if planning_already_done[bi] or routes_are_done[bi]:
                 updated_routes[bi] = -1
 
@@ -394,10 +395,6 @@ class RouteGenBatchState:
                 if type(route) is list:
                     route = torch.tensor(route, device=self.device)
                 length = (route > -1).sum()
-                if length < 2:
-                    # this is an invalid route
-                    log.warn('invalid route!')
-                    continue
                 self._finished_routes[bi].append(route[:length])
     
     def _update_route_data(self):
@@ -899,20 +896,13 @@ class CostModule(torch.nn.Module):
         log.debug("summing cost components")
 
         zero = torch.zeros_like(route_lens)
-        route_len_delta = (state.min_route_len[:, None] - route_lens)
-        route_len_delta = route_len_delta.maximum(zero)
-        # don't penalize placeholer "dummy" routes in the tensor
-        route_len_delta[route_lens == 0] = 0
         if state.max_route_len is not None:
-            route_len_over = (route_lens - state.max_route_len[:, None])
-            route_len_delta = route_len_delta + route_len_over.maximum(zero)
-        
-        # if there is a current route, it's already included in route_len_delta
-        n_unstarted_routes = \
-            state.n_routes_left_to_plan - \
-                (state.has_current_route).to(torch.float32)
-        n_stops_oob = route_len_delta.sum(-1) + \
-            n_unstarted_routes * state.min_route_len
+            route_len_over = route_lens - state.max_route_len[:, None]
+            route_len_delta = route_len_over.maximum(zero)
+        else:
+            route_len_delta = torch.zeros_like(route_lens)
+
+        n_stops_oob = route_len_delta.sum(-1)
 
         assert (n_stops_oob >= 0).all(), "negative stops-out-of-bounds!"
 
@@ -1262,9 +1252,9 @@ class MyCostModule(CostModule):
         # fraction of demand not covered by routes, and fraction of routes
         frac_uncovered = cho.n_disconnected_demand_edges / state.n_demand_edges
         if state.max_route_len is None:
-            denom = n_routes * state.max_route_len
+            denom = torch.ones_like(n_routes)
         else:
-            denom = n_routes * state.min_route_len
+            denom = n_routes * state.max_route_len
         # avoid division by 0
         denom[denom == 0] = 1
         # unserved demand is treated as taking twice the diameter of the graph

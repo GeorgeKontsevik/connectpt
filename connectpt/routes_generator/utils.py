@@ -216,9 +216,10 @@ def test_method(method_fn, dataloader, eval_cfg, init_cfg, cost_obj,
         
         start_time = time.time()
 
-        state = RouteGenBatchState(data, cost_obj, eval_cfg.n_routes, 
-                                   eval_cfg.min_route_len, 
-                                   eval_cfg.max_route_len)
+        min_route_len = eval_cfg.get("min_route_len", 0)
+        state = RouteGenBatchState(data, cost_obj, eval_cfg.n_routes,
+                                   min_route_len=min_route_len,
+                                   max_route_len=eval_cfg.max_route_len)
 
         init_network = init_from_cfg(state, init_cfg, routes_tensor)
         assert init_network is None or init_network.shape[1] == eval_cfg.n_routes, \

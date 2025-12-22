@@ -1405,8 +1405,6 @@ class PathCombiningRouteGenerator(RouteGeneratorBase):
             not_fully_linked = ~(state.has_path.all(-1).all(-1))
             halt_scores[not_fully_linked] = TORCH_FMIN
 
-        # don't halt if the route is too short
-        halt_scores[current_route_lens < state.min_route_len] = TORCH_FMIN
         # but do halt if it's done, including if there are no extensions
         halt_scores[old_route_is_done] = TORCH_FMAX
         ext_valid = prev_valid | next_valid
@@ -1881,7 +1879,6 @@ class UnbiasedPathCombiner(RouteGeneratorBase):
                 # decide whether to halt using context
                 halt_score = self.halt_scorer(out_context)
                 halt_score[is_done] = TORCH_FMAX
-                halt_score[route_len < state.min_route_len] = TORCH_FMIN
                 cont_score = -halt_score
                 cont_or_halt = torch.cat((cont_score, halt_score), dim=-1)
                 halt, corh_logit = select(cont_or_halt, not greedy)

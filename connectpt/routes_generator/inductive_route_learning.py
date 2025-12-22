@@ -350,9 +350,10 @@ def train_ppo(model, min_n_routes, max_n_routes, cfg, optimizer,
             # sample cost weights
             cost_weights = cost_obj.sample_variable_weights(data.num_graphs, 
                                                             device)
-            state = RouteGenBatchState(data, cost_obj, n_routes, 
-                                       cfg.eval.min_route_len,
-                                       cfg.eval.max_route_len,
+            min_route_len = cfg.eval.get("min_route_len", 0)
+            state = RouteGenBatchState(data, cost_obj, n_routes,
+                                       min_route_len=min_route_len,
+                                       max_route_len=cfg.eval.max_route_len,
                                        cost_weights=cost_weights)
             state = model.setup_planning(state)
             ep_finished = state.is_done()
@@ -600,8 +601,11 @@ def train(model, min_n_routes, max_n_routes, cfg, optimizer, train_dataloader,
             # sample cost weights
             cost_weights = \
                 cost_obj.sample_variable_weights(data.num_graphs, device)
-            state = RouteGenBatchState(data, cost_obj, n_routes, cfg.eval.min_route_len,
-                                       cfg.eval.max_route_len, cost_weights=cost_weights)
+            min_route_len = cfg.eval.get("min_route_len", 0)
+            state = RouteGenBatchState(data, cost_obj, n_routes,
+                                       min_route_len=min_route_len,
+                                       max_route_len=cfg.eval.max_route_len,
+                                       cost_weights=cost_weights)
             state = model.setup_planning(state)
             
             # run those graphs though the net

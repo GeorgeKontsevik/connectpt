@@ -219,6 +219,46 @@ def bee_colony(state, cost_obj, init_network, n_bees=10, passes_per_it=5,
     return state, cost_history
 
 
+def _seed_empty_routes(batch_routes, are_neighbours):
+    bee_dim = batch_routes.ndim == 3
+    if bee_dim:
+        flat_routes = batch_routes.flatten(0, 1)
+        n_bees = batch_routes.shape[1]
+    else:
+        flat_routes = batch_routes
+        n_bees = 1
+
+    route_lens = (flat_routes > -1).sum(-1)
+    empty_mask = route_lens == 0
+    if not empty_mask.any().item():
+        return batch_routes
+
+    # Expand adjacency to match flattened routes for sampling.
+    are_neighbours = are_neighbours[:, None].expand(-1, n_bees, -1, -1)
+    are_neighbours = are_neighbours.flatten(0, 1)
+
+    flat_routes = flat_routes.clone()
+    empty_idxs = empty_mask.nonzero(as_tuple=False).squeeze(-1)
+
+    start_probs = are_neighbours[empty_idxs].any(-1).to(torch.float32)
+    no_start_options = start_probs.sum(-1) == 0
+    start_probs[no_start_options] = 1
+    start_nodes = start_probs.multinomial(1).squeeze(-1)
+
+    nbr_probs = are_neighbours[empty_idxs, start_nodes].to(torch.float32)
+    no_nbr_options = nbr_probs.sum(-1) == 0
+    nbr_probs[no_nbr_options] = 1
+    end_nodes = nbr_probs.multinomial(1).squeeze(-1)
+    end_nodes[no_nbr_options] = -1
+
+    flat_routes[empty_idxs, 0] = start_nodes
+    flat_routes[empty_idxs, 1] = end_nodes
+
+    if bee_dim:
+        return flat_routes.reshape(batch_routes.shape)
+    return flat_routes
+
+
 def get_mutants(bee_networks, chosen_route_idxs, n_type1, n_type2,
                 direct_sat_dmd, shorten_prob, street_node_neighbours,
                 shortest_paths, force_linking_unlinked, bee_model=None, 
@@ -230,6 +270,8 @@ def get_mutants(bee_networks, chosen_route_idxs, n_type1, n_type2,
     max_n_nodes = bee_networks.shape[3]
     gather_idx = gather_idx.expand(-1, -1, -1, max_n_nodes)
     modified_routes = bee_networks.gather(2, gather_idx).squeeze(2)
+    modified_routes = _seed_empty_routes(modified_routes, 
+                                         street_node_neighbours)
 
     n_bees = bee_networks.shape[1]
     scen_idxs = torch.randperm(n_bees, device=bee_networks.device)
