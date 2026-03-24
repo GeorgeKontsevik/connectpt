@@ -9,7 +9,7 @@ from .utils import _project_stop_on_road
 def project_stops_on_roads(
     roads_gdf: gpd.GeoDataFrame,
     stops_gdf: gpd.GeoDataFrame,
-    max_distance: float = 70
+    max_distance: float = 100
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """Project stops onto the nearest roads and split those roads at stop locations.
 
