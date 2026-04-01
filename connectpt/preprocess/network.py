@@ -3,8 +3,31 @@ import numpy as np
 import geopandas as gpd
 import networkx as nx
 import momepy as mp
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString
 from shapely.ops import linemerge
+
+
+def _normalize_road_geometries(roads_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    roads = roads_gdf.copy()
+    roads = roads[roads.geometry.notna() & ~roads.geometry.is_empty].copy()
+
+    def _normalize_geom(geom):
+        if geom is None or geom.is_empty:
+            return None
+        if isinstance(geom, LineString):
+            return geom
+        if isinstance(geom, MultiLineString):
+            merged = linemerge(geom)
+            if isinstance(merged, LineString):
+                return merged
+            return geom
+        return None
+
+    roads["geometry"] = roads.geometry.map(_normalize_geom)
+    roads = roads[roads.geometry.notna() & ~roads.geometry.is_empty].copy()
+    roads = roads.explode(index_parts=False).reset_index(drop=True)
+    roads = roads[roads.geometry.geom_type == "LineString"].copy()
+    return roads.reset_index(drop=True)
 
 
 def roads_to_graph(roads_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame) -> nx.Graph:
@@ -46,6 +69,7 @@ def roads_to_graph(roads_gdf: gpd.GeoDataFrame, stops_gdf: gpd.GeoDataFrame) -> 
     >>> list(nx.get_node_attributes(G, "is_stop").items())[:3]
     [((435245.5, 6138021.3), True), ((435321.8, 6138120.7), True), ...]
     """
+    roads_gdf = _normalize_road_geometries(roads_gdf)
     roads_graph = mp.gdf_to_nx(roads_gdf, multigraph=False, directed=False)
     nodes_gdf, _ = mp.nx_to_gdf(roads_graph)
 
