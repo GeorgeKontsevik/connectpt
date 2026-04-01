@@ -17,7 +17,11 @@ Typical usage:
 
 import importlib
 
-__version__ = importlib.metadata.version("connectpt")
+try:
+    __version__ = importlib.metadata.version("connectpt")
+except importlib.metadata.PackageNotFoundError:
+    # Local checkout mode: package metadata is unavailable when connectpt is not installed.
+    __version__ = "0+local"
 
 from .types import Modality
 from .preprocess_data import preprocess

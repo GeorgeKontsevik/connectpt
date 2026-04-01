@@ -7,7 +7,6 @@ import neatnet
 import shapely
 
 from shapely.geometry import Polygon, MultiPolygon
-from iduedu import get_drive_graph, graph_to_gdf
 from typing import Dict
 
 from .types import Modality, MODALITY_LINE_TAGS
@@ -32,10 +31,15 @@ def _get_electric_lines(polygon: Polygon | MultiPolygon, filter_tags: str) -> gp
 
 
 def _get_drive_lines(polygon: Polygon | MultiPolygon) -> gpd.GeoDataFrame:
-    # Download and extract drivable road network edges within a polygon
-    G = get_drive_graph(polygon=polygon)
-    edges = graph_to_gdf(G, restore_edge_geom=True)
-    edges = edges[edges.geometry.geom_type == 'LineString']
+    # Download and extract drivable road network edges within a polygon (OSMnx-only path)
+    graph = ox.graph_from_polygon(
+        polygon,
+        network_type="drive",
+        retain_all=True,
+        truncate_by_edge=True,
+    )
+    _, edges = ox.graph_to_gdfs(graph, nodes=True, edges=True, node_geometry=True, fill_edge_geometry=True)
+    edges = edges[edges.geometry.geom_type == "LineString"]
 
     return edges
 
@@ -68,7 +72,11 @@ def _preprocess_drive_lines(edges: gpd.GeoDataFrame, boundary: Polygon | MultiPo
     return lines_gdf
 
 
-def get_lines(polygon : Polygon | MultiPolygon, modalities: list[Modality] ) -> Dict[Modality, gpd.GeoDataFrame]:
+def get_lines(
+    polygon: Polygon | MultiPolygon,
+    modalities: list[Modality],
+    preloaded_drive_lines: gpd.GeoDataFrame | None = None,
+) -> Dict[Modality, gpd.GeoDataFrame]:
     """Download and preprocess transport network lines for multiple transport modalities.
 
     This function retrieves, processes, and unifies transport line geometries (bus, tram, trolleybus, etc.)
@@ -113,7 +121,15 @@ def get_lines(polygon : Polygon | MultiPolygon, modalities: list[Modality] ) -> 
         modality_tag = MODALITY_LINE_TAGS[modality]
         if modality_tag is None:
             # For bus, we use driving roads
-            roads_gdf = _get_drive_lines(polygon)
+            if preloaded_drive_lines is not None and not preloaded_drive_lines.empty:
+                roads_gdf = preloaded_drive_lines.copy()
+                if roads_gdf.crs is None:
+                    roads_gdf = roads_gdf.set_crs(4326)
+                local_crs = roads_gdf.estimate_utm_crs()
+                if local_crs is not None:
+                    roads_gdf = roads_gdf.to_crs(local_crs)
+            else:
+                roads_gdf = _get_drive_lines(polygon)
             processed_lines = _preprocess_drive_lines(roads_gdf, boundary = polygon)
             processed_lines["modality"] = modality.value
         else:
@@ -124,5 +140,3 @@ def get_lines(polygon : Polygon | MultiPolygon, modalities: list[Modality] ) -> 
         result[modality] = processed_lines.reset_index(drop=True)
 
     return result
-
-

@@ -9,6 +9,8 @@ from loguru import logger
 from shapely.geometry import Polygon, MultiPolygon
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
+from scipy.spatial import cKDTree
+from tqdm.auto import tqdm
 
 from .types import Modality, MODALITY_STOP_TAGS
 
@@ -105,7 +107,7 @@ def _calculate_name_similarity(name1: str, name2: str) -> float:
     return similarity
 
 
-def _calculate_median_distance(stops_gdf: gpd.GeoDataFrame) -> float:
+def _calculate_median_distance(stops_gdf: gpd.GeoDataFrame, progress_desc: str = "Stops median distance") -> float:
     """Calculate the median spatial distance between stops with similar names.
 
     This function estimates a characteristic merging distance for public transport stops
@@ -140,30 +142,46 @@ def _calculate_median_distance(stops_gdf: gpd.GeoDataFrame) -> float:
     42.5
     """
     MAX_DISTANCE = 100  # maximum allowed distance in meters
-    distances = []
-    
+    distances: list[float] = []
+
     # Filter out stops with empty names
-    valid_stops = stops_gdf[stops_gdf['name'].notna() & (stops_gdf['name'] != '')]
-    
-    # Compare all pairs of stops
-    names = valid_stops['name'].values
-    geoms = valid_stops.geometry.values
-    
-    for i in range(len(valid_stops)):
-        for j in range(i + 1, len(valid_stops)):
-            # Calculate name similarity
-            similarity = _calculate_name_similarity(names[i], names[j])
-            
-            # If names are similar enough, calculate distance
-            if similarity >= 0.9:
-                dist = geoms[i].distance(geoms[j])
-                # Only append if distance is within threshold
-                if dist <= MAX_DISTANCE:
-                    distances.append(dist)
-    
+    valid_stops = stops_gdf[stops_gdf["name"].notna() & (stops_gdf["name"] != "")]
+    total = len(valid_stops)
+    if total < 2:
+        return 100
+
+    names = valid_stops["name"].astype("string").tolist()
+    name_sets = [_preprocess_stop_name(name) for name in names]
+    coords = np.column_stack((valid_stops.geometry.x.to_numpy(), valid_stops.geometry.y.to_numpy()))
+    tree = cKDTree(coords)
+
+    for i in tqdm(
+        range(total),
+        total=total,
+        desc=progress_desc,
+        ascii=True,
+        dynamic_ncols=True,
+        mininterval=0.5,
+    ):
+        neighbors = tree.query_ball_point(coords[i], r=MAX_DISTANCE)
+        for j in neighbors:
+            if j <= i:
+                continue
+            words_i = name_sets[i]
+            words_j = name_sets[j]
+            if not words_i or not words_j:
+                continue
+            common_words = words_i.intersection(words_j)
+            similarity = len(common_words) / max(len(words_i), len(words_j))
+            if similarity < 0.9:
+                continue
+            dist = float(np.linalg.norm(coords[i] - coords[j]))
+            if dist <= MAX_DISTANCE:
+                distances.append(dist)
+
     if not distances:  # If no valid pairs found
         return 100  # Default value
-        
+
     return np.median(distances)
 
 
@@ -178,7 +196,11 @@ def _get_stops(polygon: Polygon | MultiPolygon, modality_tags: dict) -> gpd.GeoD
     return stops_points
 
 
-def aggregate_stops(stops_gdf: gpd.GeoDataFrame, distance_threshold: int = None) -> gpd.GeoDataFrame:
+def aggregate_stops(
+    stops_gdf: gpd.GeoDataFrame,
+    distance_threshold: int = None,
+    progress_desc: str = "Stops aggregation",
+) -> gpd.GeoDataFrame:
     """Aggregate nearby public transport stops based on spatial and name similarity.
 
     This function merges stops that are either spatially close or have similar names,
@@ -230,34 +252,52 @@ def aggregate_stops(stops_gdf: gpd.GeoDataFrame, distance_threshold: int = None)
     """
     if distance_threshold is None:
         # Calculate automatic threshold
-        median_dist = _calculate_median_distance(stops_gdf)
+        median_dist = _calculate_median_distance(
+            stops_gdf,
+            progress_desc=f"{progress_desc}: threshold",
+        )
         distance_threshold = int(median_dist)
         logger.info(f"Automatically calculated distance_threshold: {distance_threshold:.2f}m")
 
     n_stops = len(stops_gdf)
-    # Adjacency matrix initialization
-    adjacency = np.zeros((n_stops, n_stops))
-    # rows, cols = [], []
-    stops_buffered = stops_gdf.copy()
-    stops_buffered.geometry = stops_gdf.geometry.buffer(distance_threshold)
+    if n_stops == 0:
+        return gpd.GeoDataFrame(
+            {"geometry": [], "name": [], "group_name": [], "original_stops": [], "original_ids": []},
+            geometry="geometry",
+            crs=stops_gdf.crs,
+        )
+
+    coords = np.column_stack((stops_gdf.geometry.x.to_numpy(), stops_gdf.geometry.y.to_numpy()))
+    tree = cKDTree(coords)
+    names = stops_gdf["name"] if "name" in stops_gdf.columns else pd.Series([None] * n_stops, index=stops_gdf.index)
+    name_sets = [_preprocess_stop_name(name) for name in names.tolist()]
+    max_pair_radius = float(max(2 * distance_threshold, 300))
+    rows: list[int] = []
+    cols: list[int] = []
 
     # Fill adjacency matrix based on rules
-    for i in range(n_stops):
-        for j in range(i+1, n_stops):
-            # Buffer intersection
-            buffers_intersect = stops_buffered.iloc[i].geometry.intersects(
-                stops_buffered.iloc[j].geometry
-            )
-            
-            # Calculate name similarity
-            name_similarity = _calculate_name_similarity(
-                stops_gdf.iloc[i]['name'],
-                stops_gdf.iloc[j]['name']
-            )
-            
-            # Determine actual distance between points
-            distance = stops_gdf.iloc[i].geometry.distance(stops_gdf.iloc[j].geometry)
-            
+    for i in tqdm(
+        range(n_stops),
+        total=n_stops,
+        desc=progress_desc,
+        ascii=True,
+        dynamic_ncols=True,
+        mininterval=0.5,
+    ):
+        neighbors = tree.query_ball_point(coords[i], r=max_pair_radius)
+        for j in neighbors:
+            if j <= i:
+                continue
+            distance = float(np.linalg.norm(coords[i] - coords[j]))
+            buffers_intersect = distance <= float(2 * distance_threshold)
+            words_i = name_sets[i]
+            words_j = name_sets[j]
+            if words_i and words_j:
+                common_words = words_i.intersection(words_j)
+                name_similarity = len(common_words) / max(len(words_i), len(words_j))
+            else:
+                name_similarity = 0.0
+
             #  Merging rules:
             # 1. If buffers overlap
             # 2. Or if names are similar AND distance < 100m
@@ -269,13 +309,15 @@ def aggregate_stops(stops_gdf: gpd.GeoDataFrame, distance_threshold: int = None)
                     (name_similarity == 1.0 and distance <= 300)  # similar names up to 300m
                 ))
             )
-            
+
             if should_merge:
-                adjacency[i,j] = adjacency[j,i] = 1
+                rows.extend((i, j))
+                cols.extend((j, i))
 
 
     # Find connected components
-    sparse_matrix = csr_matrix(adjacency)
+    data = np.ones(len(rows), dtype=np.int8)
+    sparse_matrix = csr_matrix((data, (rows, cols)), shape=(n_stops, n_stops))
     n_components, labels = connected_components(sparse_matrix, directed=False)
 
 
@@ -304,8 +346,8 @@ def aggregate_stops(stops_gdf: gpd.GeoDataFrame, distance_threshold: int = None)
             'original_stops': len(group),
             'original_ids': group
         })
-        result = gpd.GeoDataFrame(aggregated_stops, crs=stops_gdf.crs)
-        
+    result = gpd.GeoDataFrame(aggregated_stops, crs=stops_gdf.crs)
+
     return result
 
 
@@ -362,7 +404,7 @@ def get_agg_stops(polygon: Polygon | MultiPolygon, modalities: list[Modality] ) 
         if stops_points.empty:
             continue
 
-        agg = aggregate_stops(stops_points)
+        agg = aggregate_stops(stops_points, progress_desc=f"Stops aggregation [{modality.value}]")
         agg["modality"] = modality.value  
         result[modality] = agg.reset_index(drop=True)
 
