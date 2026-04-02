@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+import sys
 
 import numpy as np
 import pandas as pd
@@ -13,6 +14,9 @@ from scipy.spatial import cKDTree
 from tqdm.auto import tqdm
 
 from .types import Modality, MODALITY_STOP_TAGS
+
+
+TQDM_DISABLE = not sys.stderr.isatty()
 
 
 def _preprocess_stop_name(name: str) -> set:
@@ -159,6 +163,8 @@ def _calculate_median_distance(stops_gdf: gpd.GeoDataFrame, progress_desc: str =
         range(total),
         total=total,
         desc=progress_desc,
+        disable=TQDM_DISABLE,
+        leave=False,
         ascii=True,
         dynamic_ncols=True,
         mininterval=0.5,
@@ -280,6 +286,8 @@ def aggregate_stops(
         range(n_stops),
         total=n_stops,
         desc=progress_desc,
+        disable=TQDM_DISABLE,
+        leave=False,
         ascii=True,
         dynamic_ncols=True,
         mininterval=0.5,
