@@ -281,6 +281,11 @@ def aggregate_stops(
     rows: list[int] = []
     cols: list[int] = []
 
+    logger.info(
+        f"{progress_desc}: aggregating {n_stops} stops "
+        f"(distance_threshold={float(distance_threshold):.2f}m, candidate_radius={max_pair_radius:.2f}m)"
+    )
+
     # Fill adjacency matrix based on rules
     for i in tqdm(
         range(n_stops),
@@ -327,6 +332,10 @@ def aggregate_stops(
     data = np.ones(len(rows), dtype=np.int8)
     sparse_matrix = csr_matrix((data, (rows, cols)), shape=(n_stops, n_stops))
     n_components, labels = connected_components(sparse_matrix, directed=False)
+    logger.info(
+        f"{progress_desc}: connectivity graph built "
+        f"(pairs={len(rows) // 2}, components={n_components})"
+    )
 
 
     groups = {}
@@ -355,6 +364,10 @@ def aggregate_stops(
             'original_ids': group
         })
     result = gpd.GeoDataFrame(aggregated_stops, crs=stops_gdf.crs)
+    logger.info(
+        f"{progress_desc}: aggregation complete "
+        f"({len(result)} aggregated stops from {n_stops} raw stops)"
+    )
 
     return result
 
