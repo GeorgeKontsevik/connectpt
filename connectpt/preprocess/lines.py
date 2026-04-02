@@ -60,11 +60,25 @@ def _preprocess_electric_lines(edges: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return lines_gdf
 
 
-def _preprocess_drive_lines(edges: gpd.GeoDataFrame, boundary: Polygon | MultiPolygon) -> gpd.GeoDataFrame:
+def _preprocess_drive_lines(
+    edges: gpd.GeoDataFrame,
+    boundary: Polygon | MultiPolygon,
+    preloaded_buildings: gpd.GeoDataFrame | None = None,
+) -> gpd.GeoDataFrame:
     # Preprocess driveable network lines to create clean, continuous geometries
-    buildings = (ox.features_from_polygon(boundary, tags={"building": True})
-                    .query('building != "roof"')
-                    .to_crs(edges.crs))
+    if preloaded_buildings is not None and not preloaded_buildings.empty:
+        buildings = preloaded_buildings.copy()
+        buildings = buildings[buildings.geometry.notna() & ~buildings.geometry.is_empty].copy()
+        if "building" in buildings.columns:
+            buildings = buildings.query('building != "roof"').copy()
+        if buildings.crs is None:
+            buildings = buildings.set_crs(edges.crs)
+        elif buildings.crs != edges.crs:
+            buildings = buildings.to_crs(edges.crs)
+    else:
+        buildings = (ox.features_from_polygon(boundary, tags={"building": True})
+                        .query('building != "roof"')
+                        .to_crs(edges.crs))
     simplified = neatnet.neatify(edges, exclusion_mask=buildings.geometry , max_segment_length = 1)
     simplified_geom = _close_gaps(simplified, tolerance=0.5)
     lines_gdf = gpd.GeoDataFrame(geometry=simplified_geom)
@@ -76,6 +90,7 @@ def get_lines(
     polygon: Polygon | MultiPolygon,
     modalities: list[Modality],
     preloaded_drive_lines: gpd.GeoDataFrame | None = None,
+    preloaded_buildings: gpd.GeoDataFrame | None = None,
 ) -> Dict[Modality, gpd.GeoDataFrame]:
     """Download and preprocess transport network lines for multiple transport modalities.
 
@@ -130,7 +145,11 @@ def get_lines(
                     roads_gdf = roads_gdf.to_crs(local_crs)
             else:
                 roads_gdf = _get_drive_lines(polygon)
-            processed_lines = _preprocess_drive_lines(roads_gdf, boundary = polygon)
+            processed_lines = _preprocess_drive_lines(
+                roads_gdf,
+                boundary=polygon,
+                preloaded_buildings=preloaded_buildings,
+            )
             processed_lines["modality"] = modality.value
         else:
             lines_gdf = _get_electric_lines(polygon, modality_tag)
