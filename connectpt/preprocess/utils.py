@@ -6,6 +6,16 @@ from shapely import line_locate_point, union_all
 from shapely.ops import linemerge
 
 
+def _as_geodataframe(frame, crs=None):
+    if isinstance(frame, gpd.GeoDataFrame):
+        result = frame.copy()
+        if result.crs is None and crs is not None:
+            result = result.set_crs(crs)
+        return result
+    result = gpd.GeoDataFrame(frame.copy(), geometry="geometry", crs=crs)
+    return result
+
+
 def _close_gaps(gdf, tolerance) -> gpd.GeoSeries:
     """Function from momepy. Close gaps in LineString geometry where it should be contiguous.
 
@@ -56,16 +66,18 @@ def _close_gaps(gdf, tolerance) -> gpd.GeoSeries:
 
 def restore_linestrings(edges_gdf, nodes_gdf):
     # Restore None geometries for roads
-    edges = edges_gdf.copy()
-    
-    mask = edges.geometry.isna() | edges.geometry.is_empty
+    nodes_crs = getattr(nodes_gdf, "crs", None)
+    edges = _as_geodataframe(edges_gdf, crs=getattr(edges_gdf, "crs", None) or nodes_crs)
+    nodes = _as_geodataframe(nodes_gdf, crs=nodes_crs or getattr(edges, "crs", None))
+    geometry = gpd.GeoSeries(edges["geometry"], crs=edges.crs)
+    mask = geometry.isna() | geometry.is_empty
     
     for idx in edges[mask].index:
         start_node = edges.loc[idx, 'node_start']
         end_node = edges.loc[idx, 'node_end']
         
-        start_point = nodes_gdf.loc[start_node, 'geometry']
-        end_point = nodes_gdf.loc[end_node, 'geometry']
+        start_point = nodes.loc[start_node, 'geometry']
+        end_point = nodes.loc[end_node, 'geometry']
         
         line = LineString([
             (start_point.x, start_point.y),
@@ -74,7 +86,7 @@ def restore_linestrings(edges_gdf, nodes_gdf):
         
         edges.loc[idx, 'geometry'] = line
     
-    return edges
+    return gpd.GeoDataFrame(edges, geometry="geometry", crs=edges.crs)
 
 
 def _cut(line: LineString, distance: float) -> list[LineString]:
@@ -100,5 +112,4 @@ def _project_stop_on_road(road_geom: LineString, stop_geom: Point) -> list[LineS
     splitted_road = _cut(road_geom, distance)
 
     return splitted_road
-
 

@@ -6,9 +6,9 @@
 # such as versioning, author information, and license details.
 # """
 
-import importlib
+from importlib import metadata
 
-__version__ = importlib.metadata.version("connectpt") # TODO поменять название в соответствии с pyproject.toml
+__version__ = metadata.version("connectpt") # TODO поменять название в соответствии с pyproject.toml
 # __author__ = "Vasilii Starikov"
 # __email__ = "vasilstar97@gmail.com"
 # __credits__ = []

@@ -172,6 +172,8 @@ def floyd_warshall(edge_cost_tensor, return_raw_tensors=True):
     has_edge_mat = dists < float("inf")
     for vv in range(num_nodes):
         has_edge_to_v = has_edge_mat[:, vv]
+        if has_edge_to_v.ndim > 1:
+            has_edge_to_v = has_edge_to_v.any(dim=-1)
         nexts[has_edge_to_v, vv] = vv
 
     # the core loop

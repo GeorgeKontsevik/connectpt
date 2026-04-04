@@ -10,7 +10,7 @@ from shapely.geometry import Polygon, MultiPolygon
 from typing import Dict
 
 from .types import Modality, MODALITY_LINE_TAGS
-from .utils import _close_gaps, restore_linestrings
+from .utils import _as_geodataframe, _close_gaps, restore_linestrings
 
 ox.settings.useful_tags_way.append("railway")
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -22,6 +22,8 @@ def _get_electric_lines(polygon: Polygon | MultiPolygon, filter_tags: str) -> gp
     custom_filter = filter_tags
     G = ox.graph_from_polygon(polygon, network_type='all', custom_filter=custom_filter, retain_all=True, truncate_by_edge=True)
     n,e = mp.nx_to_gdf(G)
+    n = _as_geodataframe(n, crs=getattr(n, "crs", None) or 4326)
+    e = _as_geodataframe(e, crs=getattr(e, "crs", None) or getattr(n, "crs", None) or 4326)
     edges = restore_linestrings(e, n)
     edges = edges.clip(polygon)
     local_crs = edges.estimate_utm_crs()
