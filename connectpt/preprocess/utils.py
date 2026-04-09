@@ -1,7 +1,7 @@
 import numpy as np
 import geopandas as gpd
 import shapely
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString, MultiLineString, GeometryCollection
 from shapely import line_locate_point, union_all
 from shapely.ops import linemerge
 
@@ -106,10 +106,32 @@ def _cut(line: LineString, distance: float) -> list[LineString]:
             return [LineString(coords[:i] + [(cp.x, cp.y)]), LineString([(cp.x, cp.y)] + coords[i:])]
         
 
+def _normalize_road_geometry_for_projection(road_geom, stop_geom: Point) -> LineString:
+    if isinstance(road_geom, LineString):
+        return road_geom
+
+    if isinstance(road_geom, MultiLineString):
+        merged = linemerge(road_geom)
+        if isinstance(merged, LineString):
+            return merged
+        if isinstance(merged, MultiLineString):
+            parts = [part for part in merged.geoms if isinstance(part, LineString) and not part.is_empty]
+            if not parts:
+                raise ValueError("Road MultiLineString does not contain usable LineString parts.")
+            return min(parts, key=lambda geom: geom.distance(stop_geom))
+
+    if isinstance(road_geom, GeometryCollection):
+        parts = [geom for geom in road_geom.geoms if isinstance(geom, LineString) and not geom.is_empty]
+        if parts:
+            return min(parts, key=lambda geom: geom.distance(stop_geom))
+
+    raise TypeError(f"Unsupported road geometry type for stop projection: {road_geom.geom_type}")
+
+
 def _project_stop_on_road(road_geom: LineString, stop_geom: Point) -> list[LineString]:
     # Project stops on road geometry and return LineStrings of splitted road
-    distance = line_locate_point(road_geom, stop_geom)
-    splitted_road = _cut(road_geom, distance)
+    projected_geom = _normalize_road_geometry_for_projection(road_geom, stop_geom)
+    distance = line_locate_point(projected_geom, stop_geom)
+    splitted_road = _cut(projected_geom, distance)
 
     return splitted_road
-
