@@ -324,9 +324,9 @@ def stop_complete_then_prune(
                     pass
 
             SG.add_edge(s, t, **attrs)
-            
-            simple_graph = nx.convert_node_labels_to_integers(SG)
 
+    # Always return a graph object, even when no valid stop-to-stop edges were created.
+    simple_graph = nx.convert_node_labels_to_integers(SG)
     return simple_graph
 
 
