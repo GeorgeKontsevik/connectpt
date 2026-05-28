@@ -320,7 +320,7 @@ class DynamicCityGraphDataset(torch.utils.data.IterableDataset):
         
 
 class InsertPosFeatures(BaseTransform):
-    def __call__(self, data):
+    def forward(self, data):
         data = data.clone()
         for key in [STOP_KEY]:
             val = data[key]
@@ -335,8 +335,8 @@ class RandomFlipCity(RandomFlip):
     def __init__(self, axis=0) -> None:
         super().__init__(axis)
 
-    def __call__(self, data: Data) -> Data:
-        super().__call__(data[STOP_KEY])
+    def forward(self, data: Data) -> Data:
+        super().forward(data[STOP_KEY])
         return data
 
 
@@ -346,7 +346,7 @@ class SpaceScaleTransform(BaseTransform):
         self.min_scale = min_scale
         self.max_scale = max_scale
 
-    def __call__(self, data):
+    def forward(self, data):
         data = data.clone()
         scale_range = self.max_scale - self.min_scale
         scale = torch.rand(1) * scale_range + self.min_scale
@@ -362,7 +362,7 @@ class DemandScaleTransform(BaseTransform):
         self.min_scale = min_scale
         self.max_scale = max_scale
 
-    def __call__(self, data):
+    def forward(self, data):
         data = data.clone()
         scale_range = self.max_scale - self.min_scale
         scale = torch.rand(1) * scale_range + self.min_scale
@@ -376,7 +376,17 @@ class DemandScaleTransform(BaseTransform):
 
 class CityGraphData(HeteroData):
     def __cat_dim__(self, key, value, *args, **kwargs):
-        if key in ['demand', 'drive_times', 'street_adj', 'nexts']:
+        if key in [
+            'demand',
+            'drive_times',
+            'street_adj',
+            'nexts',
+            'street_pattern_classes',
+            'focus_class_id',
+            'focus_class_target_shares',
+            'street_pattern_target_shares',
+            'street_pattern_class_weights',
+        ]:
             return None
         else:
             return super().__cat_dim__(key, value, *args, **kwargs)
@@ -633,6 +643,16 @@ class CityGraphData(HeteroData):
         dmd_edge_feat = torch.stack((demand_feat, drive_time_feat), dim=1)
         data[DEMAND_KEY].edge_attr = dmd_edge_feat
         data.demand = demand
+        if "street_pattern_classes" in tensors:
+            data.street_pattern_classes = tensors["street_pattern_classes"].to(dtype=torch.long)
+        if "focus_class_id" in tensors:
+            data.focus_class_id = tensors["focus_class_id"].to(dtype=torch.long)
+        if "focus_class_target_shares" in tensors:
+            data.focus_class_target_shares = tensors["focus_class_target_shares"].to(dtype=torch.float32)
+        if "street_pattern_target_shares" in tensors:
+            data.street_pattern_target_shares = tensors["street_pattern_target_shares"].to(dtype=torch.float32)
+        if "street_pattern_class_weights" in tensors:
+            data.street_pattern_class_weights = tensors["street_pattern_class_weights"].to(dtype=torch.float32)
 
         assert data.fixed_routes is not None
         return data

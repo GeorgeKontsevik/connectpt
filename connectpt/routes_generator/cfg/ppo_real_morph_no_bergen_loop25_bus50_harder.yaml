@@ -1,0 +1,56 @@
+ppo:
+  n_iterations: 30
+  val_period: 5
+  n_epochs: 1
+  minibatch_size: 16
+  horizon: 120
+  epsilon: 0.2
+  use_gae: true
+  gae_lambda: 0.95
+
+discount_rate: 0.95
+diff_reward: true
+baseline_lr: 0.0005
+entropy_weight: 0.0
+batch_size: 16
+reward_scale: 1.0
+lr: 0.0006
+decay: 0.0008404361781997002
+optimizer: Adam
+
+run_name: no_bergen_loop25_conn40_dup25_loopdup25_loopshare10
+
+eval:
+  min_route_len: 2
+  max_route_len: 12
+  n_routes: 10
+
+dataset:
+  type: pickle
+  kwargs:
+    path: ${oc.env:SUPER_DUPER_DISSER_ROOT,/Users/gk/Code/super-duper-disser}/connectpt/datasets/real_morph_no_bergen_loop25_bus50
+    space_scale: 0.2
+    demand_scale: 0.2
+
+outdir: ${oc.env:SUPER_DUPER_DISSER_ROOT,/Users/gk/Code/super-duper-disser}/connectpt/model_weights/real_morph_no_bergen_loop25_bus50_harder
+
+experiment:
+  cost_function:
+    kwargs:
+      demand_time_weight: 0.0
+      route_time_weight: 0.0
+      median_connectivity_weight: 0.4
+      street_pattern_weight: 0.0
+      focus_class_weight: 0.1
+      focus_class_presence_weight: 0.0
+      focus_class_distribution_weight: 0.0
+      street_pattern_diversity_weight: 0.0
+      street_pattern_target_distribution_weight: 0.0
+      route_overlap_weight: 0.25
+      focus_class_overlap_weight: 0.25
+      variable_weights: false
+
+defaults:
+  - experiment: standard
+  - model: bestsofar_feb2023
+  - _self_

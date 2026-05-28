@@ -804,7 +804,7 @@ def setup_and_train(cfg: DictConfig, trial: optuna.trial.Trial = None):
     
     return best_cost
 
-@hydra.main(version_base=None, config_path="../cfg", config_name="ppo_20nodes")
+@hydra.main(version_base=None, config_path="cfg", config_name="ppo_20nodes")
 def main(cfg: DictConfig):
     return setup_and_train(cfg)
 

@@ -457,12 +457,22 @@ def get_eval_cfg(cfg_dir: str, base_cfg_name: str = "eval_model_mumford", params
     # mapping "human-friendly" keys to Hydra paths
     key_map = {
         "dataset_name": "+eval.dataset.type",  # добавляем новый ключ
+        "n_samples": "++n_samples",
         "n_routes": "+eval.n_routes",          # добавляем новый ключ, если нет
         "min_route_len": "+eval.min_route_len",
         "max_route_len": "+eval.max_route_len",
         "demand_time_weight": "++experiment.cost_function.kwargs.demand_time_weight",
         "route_time_weight": "++experiment.cost_function.kwargs.route_time_weight",
         "median_connectivity_weight": "++experiment.cost_function.kwargs.median_connectivity_weight",
+        "street_pattern_weight": "++experiment.cost_function.kwargs.street_pattern_weight",
+        "focus_class_weight": "++experiment.cost_function.kwargs.focus_class_weight",
+        "focus_class_presence_weight": "++experiment.cost_function.kwargs.focus_class_presence_weight",
+        "focus_class_presence_threshold": "++experiment.cost_function.kwargs.focus_class_presence_threshold",
+        "focus_class_distribution_weight": "++experiment.cost_function.kwargs.focus_class_distribution_weight",
+        "street_pattern_diversity_weight": "++experiment.cost_function.kwargs.street_pattern_diversity_weight",
+        "street_pattern_target_distribution_weight": "++experiment.cost_function.kwargs.street_pattern_target_distribution_weight",
+        "route_overlap_weight": "++experiment.cost_function.kwargs.route_overlap_weight",
+        "focus_class_overlap_weight": "++experiment.cost_function.kwargs.focus_class_overlap_weight",
         "constraint_violation_weight": "++experiment.cost_function.kwargs.constraint_violation_weight",
         "use_weighted_connectivity": "++experiment.cost_function.kwargs.use_weighted_connectivity",
         "variable_weights": "++experiment.cost_function.kwargs.variable_weights",

@@ -38,9 +38,9 @@ Typical usage:
 >>> cost, unserved, metrics = test_method(my_method, dataloader, cfg.eval, cfg.init, cost_obj)
 """
 
-import importlib
+from importlib import metadata
 
-__version__ = importlib.metadata.version("connectpt")
+__version__ = metadata.version("connectpt")
 
 # === Dataset & Graph Utilities ===
 from .citygraph_dataset import (

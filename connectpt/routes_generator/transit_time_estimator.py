@@ -796,6 +796,20 @@ class CostHelperOutput:
     cost: Optional[Tensor] = None
     median_connectivity: Optional[Tensor] = None
     median_connectivity_weighted: Optional[Tensor] = None
+    street_pattern_class_count: Optional[Tensor] = None
+    street_pattern_penalty: Optional[Tensor] = None
+    street_pattern_focus_class_share: Optional[Tensor] = None
+    street_pattern_focus_class_penalty: Optional[Tensor] = None
+    street_pattern_focus_class_presence_share: Optional[Tensor] = None
+    street_pattern_focus_class_presence_penalty: Optional[Tensor] = None
+    street_pattern_focus_class_distribution_penalty: Optional[Tensor] = None
+    street_pattern_composition_diversity: Optional[Tensor] = None
+    street_pattern_composition_diversity_penalty: Optional[Tensor] = None
+    street_pattern_target_distribution_penalty: Optional[Tensor] = None
+    route_overlap_duplicate_edge_share: Optional[Tensor] = None
+    route_overlap_penalty: Optional[Tensor] = None
+    route_focus_overlap_duplicate_edge_share: Optional[Tensor] = None
+    route_focus_overlap_penalty: Optional[Tensor] = None
 
     @property
     def mean_demand_time(self):
@@ -820,7 +834,20 @@ class CostHelperOutput:
             '# stops out of bounds': self.n_stops_oob.float(),
             'median_connectivity': self.median_connectivity / 60 if self.median_connectivity is not None else None,
             'median_connectivity_weighted': self.median_connectivity_weighted / 60 if self.median_connectivity_weighted is not None else None,
-
+            'street_pattern_class_count': self.street_pattern_class_count,
+            'street_pattern_penalty': self.street_pattern_penalty,
+            'street_pattern_focus_class_share': self.street_pattern_focus_class_share,
+            'street_pattern_focus_class_penalty': self.street_pattern_focus_class_penalty,
+            'street_pattern_focus_class_presence_share': self.street_pattern_focus_class_presence_share,
+            'street_pattern_focus_class_presence_penalty': self.street_pattern_focus_class_presence_penalty,
+            'street_pattern_focus_class_distribution_penalty': self.street_pattern_focus_class_distribution_penalty,
+            'street_pattern_composition_diversity': self.street_pattern_composition_diversity,
+            'street_pattern_composition_diversity_penalty': self.street_pattern_composition_diversity_penalty,
+            'street_pattern_target_distribution_penalty': self.street_pattern_target_distribution_penalty,
+            'route_overlap_duplicate_edge_share': self.route_overlap_duplicate_edge_share,
+            'route_overlap_penalty': self.route_overlap_penalty,
+            'route_focus_overlap_duplicate_edge_share': self.route_focus_overlap_duplicate_edge_share,
+            'route_focus_overlap_penalty': self.route_focus_overlap_penalty,
         }
         return metrics
 
@@ -1007,6 +1034,15 @@ class MyCostModule(CostModule):
                  symmetric_routes=True, low_memory_mode=False, use_weighted_connectivity=False,
                  demand_time_weight=0.33, route_time_weight=0.33,
                  median_connectivity_weight=0.33,
+                 street_pattern_weight=0.0,
+                 focus_class_weight=0.0,
+                 focus_class_presence_weight=0.0,
+                 focus_class_presence_threshold=0.0,
+                 focus_class_distribution_weight=0.0,
+                 street_pattern_diversity_weight=0.0,
+                 street_pattern_target_distribution_weight=0.0,
+                 route_overlap_weight=0.0,
+                 focus_class_overlap_weight=0.0,
                  constraint_violation_weight=5, variable_weights=False,
                  ignore_stops_oob=False, pp_fraction=0.33, 
                  op_fraction=0.33, mcw_fraction=0.33):
@@ -1016,6 +1052,15 @@ class MyCostModule(CostModule):
         self.demand_time_weight = demand_time_weight
         self.route_time_weight = route_time_weight
         self.median_connectivity_weight = median_connectivity_weight
+        self.street_pattern_weight = street_pattern_weight
+        self.focus_class_weight = focus_class_weight
+        self.focus_class_presence_weight = focus_class_presence_weight
+        self.focus_class_presence_threshold = focus_class_presence_threshold
+        self.focus_class_distribution_weight = focus_class_distribution_weight
+        self.street_pattern_diversity_weight = street_pattern_diversity_weight
+        self.street_pattern_target_distribution_weight = street_pattern_target_distribution_weight
+        self.route_overlap_weight = route_overlap_weight
+        self.focus_class_overlap_weight = focus_class_overlap_weight
         self.constraint_violation_weight = constraint_violation_weight
         self.variable_weights = variable_weights
         if self.variable_weights:
@@ -1085,15 +1130,424 @@ class MyCostModule(CostModule):
         }
     
     def set_weights(self, demand_time_weight=None, route_time_weight=None, 
-                                    median_connectivity_weight=None,  constraint_violation_weight=None):
+                                    median_connectivity_weight=None,
+                                    street_pattern_weight=None,
+                                    focus_class_weight=None,
+                                    focus_class_presence_weight=None,
+                                    focus_class_presence_threshold=None,
+                                    focus_class_distribution_weight=None,
+                                    street_pattern_diversity_weight=None,
+                                    street_pattern_target_distribution_weight=None,
+                                    route_overlap_weight=None,
+                                    focus_class_overlap_weight=None,
+                                    constraint_violation_weight=None):
         if demand_time_weight is not None:
             self.demand_time_weight = demand_time_weight
         if route_time_weight is not None:
             self.route_time_weight = route_time_weight
         if median_connectivity_weight is not None:  
             self.median_connectivity_weight = median_connectivity_weight
+        if street_pattern_weight is not None:
+            self.street_pattern_weight = street_pattern_weight
+        if focus_class_weight is not None:
+            self.focus_class_weight = focus_class_weight
+        if focus_class_presence_weight is not None:
+            self.focus_class_presence_weight = focus_class_presence_weight
+        if focus_class_presence_threshold is not None:
+            self.focus_class_presence_threshold = focus_class_presence_threshold
+        if focus_class_distribution_weight is not None:
+            self.focus_class_distribution_weight = focus_class_distribution_weight
+        if street_pattern_diversity_weight is not None:
+            self.street_pattern_diversity_weight = street_pattern_diversity_weight
+        if street_pattern_target_distribution_weight is not None:
+            self.street_pattern_target_distribution_weight = street_pattern_target_distribution_weight
+        if route_overlap_weight is not None:
+            self.route_overlap_weight = route_overlap_weight
+        if focus_class_overlap_weight is not None:
+            self.focus_class_overlap_weight = focus_class_overlap_weight
         if constraint_violation_weight is not None:
             self.constraint_violation_weight = constraint_violation_weight
+
+    def _expanded_street_pattern_classes(self, state, batch_routes, *, required_weight=0.0, label="street-pattern penalty"):
+        street_pattern_classes = getattr(state.graph_data, "street_pattern_classes", None)
+        if street_pattern_classes is None:
+            if float(required_weight) > 0.0:
+                raise ValueError(
+                    f"{label} requires graph_data.street_pattern_classes. "
+                    "Pass street-pattern classes in the tensor dataset."
+                )
+            return None
+        if street_pattern_classes.ndim == 1:
+            street_pattern_classes = street_pattern_classes[None]
+        if street_pattern_classes.shape[0] == 1 and state.batch_size > 1:
+            street_pattern_classes = street_pattern_classes.expand(state.batch_size, -1)
+        return street_pattern_classes.to(batch_routes.device)
+
+    def _street_pattern_penalty(self, state, batch_routes):
+        street_pattern_classes = self._expanded_street_pattern_classes(
+            state,
+            batch_routes,
+            required_weight=self.street_pattern_weight,
+            label="street_pattern_weight > 0",
+        )
+        if street_pattern_classes is None:
+            zeros = torch.zeros(state.batch_size, device=batch_routes.device)
+            return zeros, zeros
+        per_batch_counts = []
+        max_classes = max(
+            1,
+            int(torch.unique(street_pattern_classes[street_pattern_classes >= 0]).numel()),
+        )
+        for bi in range(state.batch_size):
+            route_counts = []
+            for route in batch_routes[bi]:
+                valid_nodes = route[route >= 0].long()
+                if valid_nodes.numel() == 0:
+                    continue
+                valid_nodes = valid_nodes[valid_nodes < street_pattern_classes.shape[1]]
+                if valid_nodes.numel() == 0:
+                    continue
+                classes = street_pattern_classes[bi, valid_nodes]
+                classes = classes[classes >= 0]
+                if classes.numel() == 0:
+                    route_counts.append(torch.tensor(0.0, device=batch_routes.device))
+                else:
+                    route_counts.append(
+                        torch.tensor(
+                            float(torch.unique(classes).numel()),
+                            device=batch_routes.device,
+                        )
+                    )
+            if route_counts:
+                per_batch_counts.append(torch.stack(route_counts).mean())
+            else:
+                per_batch_counts.append(torch.tensor(0.0, device=batch_routes.device))
+        class_count = torch.stack(per_batch_counts)
+        penalty = class_count / max_classes
+        return class_count, penalty
+
+    def _street_pattern_route_class_shares(self, state, batch_routes, *, required_weight=0.0, label="street-pattern composition"):
+        street_pattern_classes = self._expanded_street_pattern_classes(
+            state,
+            batch_routes,
+            required_weight=required_weight,
+            label=label,
+        )
+        if street_pattern_classes is None:
+            return None
+        valid_classes = street_pattern_classes[street_pattern_classes >= 0]
+        if valid_classes.numel() == 0:
+            n_classes = 1
+        else:
+            n_classes = int(valid_classes.max().item()) + 1
+
+        per_batch_shares = []
+        for bi in range(state.batch_size):
+            route_shares = []
+            for route in batch_routes[bi]:
+                valid_nodes = route[route >= 0].long()
+                valid_nodes = valid_nodes[valid_nodes < street_pattern_classes.shape[1]]
+                if valid_nodes.numel() == 0:
+                    route_shares.append(torch.zeros((n_classes,), device=batch_routes.device))
+                    continue
+                classes = street_pattern_classes[bi, valid_nodes]
+                classes = classes[classes >= 0]
+                if classes.numel() == 0:
+                    route_shares.append(torch.zeros((n_classes,), device=batch_routes.device))
+                    continue
+                counts = torch.bincount(classes.long(), minlength=n_classes).to(torch.float32)
+                route_shares.append(counts / counts.sum().clamp_min(1.0))
+            if route_shares:
+                per_batch_shares.append(torch.stack(route_shares))
+            else:
+                per_batch_shares.append(torch.zeros((0, n_classes), device=batch_routes.device))
+        return per_batch_shares
+
+    def _street_pattern_composition_diversity_penalty(self, state, batch_routes):
+        per_batch_shares = self._street_pattern_route_class_shares(
+            state,
+            batch_routes,
+            required_weight=self.street_pattern_diversity_weight,
+            label="street_pattern_diversity_weight > 0",
+        )
+        if per_batch_shares is None:
+            zeros = torch.zeros(state.batch_size, device=batch_routes.device)
+            return zeros, zeros
+        diversities = []
+        penalties = []
+        for shares in per_batch_shares:
+            if shares.shape[0] < 2:
+                diversity = torch.tensor(0.0, device=batch_routes.device)
+            else:
+                # L1 distance between two probability vectors is in [0, 2].
+                diversity = torch.pdist(shares, p=1).mean() / 2.0
+            diversities.append(diversity)
+            penalties.append(1.0 - diversity.clamp(0.0, 1.0))
+        return torch.stack(diversities), torch.stack(penalties)
+
+    def _per_route_focus_class_shares(self, state, batch_routes):
+        street_pattern_classes = getattr(state.graph_data, "street_pattern_classes", None)
+        focus_class_id = getattr(state.graph_data, "focus_class_id", None)
+        if street_pattern_classes is None or focus_class_id is None:
+            if (
+                float(self.focus_class_weight) > 0.0
+                or float(self.focus_class_presence_weight) > 0.0
+                or float(self.focus_class_distribution_weight) > 0.0
+            ):
+                raise ValueError(
+                    "focus_class penalties require graph_data.street_pattern_classes and graph_data.focus_class_id."
+                )
+            return None
+        if street_pattern_classes.ndim == 1:
+            street_pattern_classes = street_pattern_classes[None]
+        if street_pattern_classes.shape[0] == 1 and state.batch_size > 1:
+            street_pattern_classes = street_pattern_classes.expand(state.batch_size, -1)
+        street_pattern_classes = street_pattern_classes.to(batch_routes.device)
+        focus_class_id = focus_class_id.to(batch_routes.device).reshape(-1)
+        if focus_class_id.shape[0] == 1 and state.batch_size > 1:
+            focus_class_id = focus_class_id.expand(state.batch_size)
+
+        per_batch_route_shares = []
+        for bi in range(state.batch_size):
+            route_shares = []
+            for route in batch_routes[bi]:
+                valid_nodes = route[route >= 0].long()
+                if valid_nodes.numel() == 0:
+                    continue
+                valid_nodes = valid_nodes[valid_nodes < street_pattern_classes.shape[1]]
+                if valid_nodes.numel() == 0:
+                    continue
+                classes = street_pattern_classes[bi, valid_nodes]
+                matched = classes == focus_class_id[bi]
+                route_shares.append(matched.to(torch.float32).mean())
+            if route_shares:
+                route_share_tensor = torch.stack(route_shares)
+            else:
+                route_share_tensor = torch.zeros((0,), device=batch_routes.device)
+            per_batch_route_shares.append(route_share_tensor)
+        return per_batch_route_shares
+
+    def _focus_class_penalty(self, state, batch_routes):
+        per_batch_route_shares = self._per_route_focus_class_shares(state, batch_routes)
+        if per_batch_route_shares is None:
+            zeros = torch.zeros(state.batch_size, device=batch_routes.device)
+            return zeros, zeros
+        per_batch_shares = []
+        for route_share_tensor in per_batch_route_shares:
+            if route_share_tensor.numel() > 0:
+                per_batch_shares.append(route_share_tensor.mean())
+            else:
+                per_batch_shares.append(torch.tensor(0.0, device=batch_routes.device))
+        share = torch.stack(per_batch_shares)
+        penalty = share
+        return share, penalty
+
+    def _focus_class_presence_penalty(self, state, batch_routes):
+        per_batch_route_shares = self._per_route_focus_class_shares(state, batch_routes)
+        if per_batch_route_shares is None:
+            if float(self.focus_class_presence_weight) > 0.0:
+                raise ValueError(
+                    "focus_class_presence_weight > 0 requires graph_data.street_pattern_classes and graph_data.focus_class_id."
+                )
+            zeros = torch.zeros(state.batch_size, device=batch_routes.device)
+            return zeros, zeros
+
+        threshold = float(self.focus_class_presence_threshold)
+        per_batch_presence = []
+        for route_share_tensor in per_batch_route_shares:
+            if route_share_tensor.numel() > 0:
+                touched = route_share_tensor > threshold
+                per_batch_presence.append(touched.to(torch.float32).mean())
+            else:
+                per_batch_presence.append(torch.tensor(0.0, device=batch_routes.device))
+        presence = torch.stack(per_batch_presence)
+        penalty = presence
+        return presence, penalty
+
+    def _focus_class_distribution_penalty(self, state, batch_routes):
+        target_shares = getattr(state.graph_data, "focus_class_target_shares", None)
+        per_batch_route_shares = self._per_route_focus_class_shares(state, batch_routes)
+        if target_shares is None or per_batch_route_shares is None:
+            if float(self.focus_class_distribution_weight) > 0.0:
+                raise ValueError(
+                    "focus_class_distribution_weight > 0 requires graph_data.focus_class_target_shares."
+                )
+            return torch.zeros(state.batch_size, device=batch_routes.device)
+        if target_shares.ndim == 1:
+            target_shares = target_shares[None]
+        if target_shares.shape[0] == 1 and state.batch_size > 1:
+            target_shares = target_shares.expand(state.batch_size, -1)
+        target_shares = target_shares.to(batch_routes.device)
+
+        penalties = []
+        for bi, route_share_tensor in enumerate(per_batch_route_shares):
+            target = target_shares[bi]
+            target = target[target >= 0]
+            pred = route_share_tensor
+            if pred.numel() == 0 and target.numel() == 0:
+                penalties.append(torch.tensor(0.0, device=batch_routes.device))
+                continue
+            if pred.numel() == 0:
+                pred = torch.zeros_like(target)
+            pred = torch.sort(pred, descending=True).values
+            target = torch.sort(target, descending=True).values
+            n = max(int(pred.numel()), int(target.numel()))
+            pred_pad = torch.zeros((n,), device=batch_routes.device)
+            target_pad = torch.zeros((n,), device=batch_routes.device)
+            pred_pad[: pred.numel()] = pred
+            target_pad[: target.numel()] = target
+            penalties.append(torch.abs(pred_pad - target_pad).mean())
+        return torch.stack(penalties)
+
+    def _street_pattern_target_distribution_penalty(self, state, batch_routes):
+        target_shares = getattr(state.graph_data, "street_pattern_target_shares", None)
+        class_weights = getattr(state.graph_data, "street_pattern_class_weights", None)
+        per_batch_shares = self._street_pattern_route_class_shares(
+            state,
+            batch_routes,
+            required_weight=self.street_pattern_target_distribution_weight,
+            label="street_pattern_target_distribution_weight > 0",
+        )
+        if target_shares is None or per_batch_shares is None:
+            if float(self.street_pattern_target_distribution_weight) > 0.0:
+                raise ValueError(
+                    "street_pattern_target_distribution_weight > 0 requires graph_data.street_pattern_target_shares."
+                )
+            return torch.zeros(state.batch_size, device=batch_routes.device)
+        if target_shares.ndim == 2:
+            target_shares = target_shares[None]
+        if target_shares.shape[0] == 1 and state.batch_size > 1:
+            target_shares = target_shares.expand(state.batch_size, -1, -1)
+        target_shares = target_shares.to(batch_routes.device)
+
+        if class_weights is None:
+            class_weights = torch.ones((target_shares.shape[-1],), device=batch_routes.device)
+        else:
+            class_weights = class_weights.to(batch_routes.device).reshape(-1)
+
+        focus_class_id = getattr(state.graph_data, "focus_class_id", None)
+        if focus_class_id is not None:
+            focus_class_id = focus_class_id.to(batch_routes.device).reshape(-1)
+            if focus_class_id.shape[0] == 1 and state.batch_size > 1:
+                focus_class_id = focus_class_id.expand(state.batch_size)
+
+        penalties = []
+        for bi, pred in enumerate(per_batch_shares):
+            target = target_shares[bi]
+            n_routes = max(int(pred.shape[0]), int(target.shape[0]))
+            n_classes = max(int(pred.shape[1]), int(target.shape[1]), int(class_weights.numel()))
+            pred_pad = torch.zeros((n_routes, n_classes), device=batch_routes.device)
+            target_pad = torch.zeros((n_routes, n_classes), device=batch_routes.device)
+            pred_pad[: pred.shape[0], : pred.shape[1]] = pred
+            target_pad[: target.shape[0], : target.shape[1]] = target
+
+            if focus_class_id is not None:
+                focus_idx = int(focus_class_id[bi].item())
+                if 0 <= focus_idx < n_classes:
+                    pred_order = torch.argsort(pred_pad[:, focus_idx], descending=True)
+                    target_order = torch.argsort(target_pad[:, focus_idx], descending=True)
+                    pred_pad = pred_pad[pred_order]
+                    target_pad = target_pad[target_order]
+
+            weights = torch.ones((n_classes,), device=batch_routes.device)
+            weights[: class_weights.numel()] = class_weights
+            diff = torch.abs(pred_pad - target_pad) * weights[None, :]
+            penalties.append(diff.sum() / (n_routes * weights.sum()).clamp_min(1.0))
+        return torch.stack(penalties)
+
+    def _route_overlap_penalty(self, state, batch_routes):
+        if batch_routes.numel() == 0:
+            zeros = torch.zeros(state.batch_size, device=batch_routes.device)
+            return zeros, zeros
+        n_nodes = int(getattr(state, "max_n_nodes", batch_routes.max().item() + 1))
+        penalties = []
+        for bi in range(state.batch_size):
+            route_edge_ids = []
+            for route in batch_routes[bi]:
+                valid_nodes = route[route >= 0].long()
+                if valid_nodes.numel() < 2:
+                    continue
+                u = valid_nodes[:-1]
+                v = valid_nodes[1:]
+                non_self = u != v
+                if not bool(non_self.any()):
+                    continue
+                u = u[non_self]
+                v = v[non_self]
+                edge_min = torch.minimum(u, v)
+                edge_max = torch.maximum(u, v)
+                edge_ids = torch.unique(edge_min * n_nodes + edge_max)
+                if edge_ids.numel() > 0:
+                    route_edge_ids.append(edge_ids)
+            if not route_edge_ids:
+                penalties.append(torch.tensor(0.0, device=batch_routes.device))
+                continue
+            all_edge_ids = torch.cat(route_edge_ids)
+            _, counts = torch.unique(all_edge_ids, return_counts=True)
+            duplicate_uses = (counts.to(torch.float32) - 1.0).clamp_min(0.0).sum()
+            penalties.append(duplicate_uses / all_edge_ids.numel())
+        penalty = torch.stack(penalties)
+        return penalty, penalty
+
+    def _focus_class_route_overlap_penalty(self, state, batch_routes):
+        if batch_routes.numel() == 0:
+            zeros = torch.zeros(state.batch_size, device=batch_routes.device)
+            return zeros, zeros
+        street_pattern_classes = getattr(state.graph_data, "street_pattern_classes", None)
+        focus_class_id = getattr(state.graph_data, "focus_class_id", None)
+        if street_pattern_classes is None or focus_class_id is None:
+            if float(self.focus_class_overlap_weight) > 0.0:
+                raise ValueError(
+                    "focus_class_overlap_weight > 0 requires graph_data.street_pattern_classes and graph_data.focus_class_id."
+                )
+            zeros = torch.zeros(state.batch_size, device=batch_routes.device)
+            return zeros, zeros
+        if street_pattern_classes.ndim == 1:
+            street_pattern_classes = street_pattern_classes[None]
+        if street_pattern_classes.shape[0] == 1 and state.batch_size > 1:
+            street_pattern_classes = street_pattern_classes.expand(state.batch_size, -1)
+        street_pattern_classes = street_pattern_classes.to(batch_routes.device)
+        focus_class_id = focus_class_id.to(batch_routes.device).reshape(-1)
+        if focus_class_id.shape[0] == 1 and state.batch_size > 1:
+            focus_class_id = focus_class_id.expand(state.batch_size)
+
+        n_nodes = int(getattr(state, "max_n_nodes", batch_routes.max().item() + 1))
+        penalties = []
+        for bi in range(state.batch_size):
+            route_edge_ids = []
+            for route in batch_routes[bi]:
+                valid_nodes = route[route >= 0].long()
+                valid_nodes = valid_nodes[valid_nodes < street_pattern_classes.shape[1]]
+                if valid_nodes.numel() < 2:
+                    continue
+                u = valid_nodes[:-1]
+                v = valid_nodes[1:]
+                non_self = u != v
+                if not bool(non_self.any()):
+                    continue
+                u = u[non_self]
+                v = v[non_self]
+                classes_u = street_pattern_classes[bi, u]
+                classes_v = street_pattern_classes[bi, v]
+                focus_edge = (classes_u == focus_class_id[bi]) | (classes_v == focus_class_id[bi])
+                if not bool(focus_edge.any()):
+                    continue
+                u = u[focus_edge]
+                v = v[focus_edge]
+                edge_min = torch.minimum(u, v)
+                edge_max = torch.maximum(u, v)
+                edge_ids = torch.unique(edge_min * n_nodes + edge_max)
+                if edge_ids.numel() > 0:
+                    route_edge_ids.append(edge_ids)
+            if not route_edge_ids:
+                penalties.append(torch.tensor(0.0, device=batch_routes.device))
+                continue
+            all_edge_ids = torch.cat(route_edge_ids)
+            _, counts = torch.unique(all_edge_ids, return_counts=True)
+            duplicate_uses = (counts.to(torch.float32) - 1.0).clamp_min(0.0).sum()
+            penalties.append(duplicate_uses / all_edge_ids.numel())
+        penalty = torch.stack(penalties)
+        return penalty, penalty
 
     def forward(self, state, constraint_weight=None, no_norm=False, 
                 return_per_route_riders=False):
@@ -1111,6 +1565,14 @@ class MyCostModule(CostModule):
             median_connectivity_weight = cost_weights['median_connectivity_weight']
         else:
             median_connectivity_weight = self.median_connectivity_weight
+        street_pattern_weight = self.street_pattern_weight
+        focus_class_weight = self.focus_class_weight
+        focus_class_presence_weight = self.focus_class_presence_weight
+        focus_class_distribution_weight = self.focus_class_distribution_weight
+        street_pattern_diversity_weight = self.street_pattern_diversity_weight
+        street_pattern_target_distribution_weight = self.street_pattern_target_distribution_weight
+        route_overlap_weight = self.route_overlap_weight
+        focus_class_overlap_weight = self.focus_class_overlap_weight
                 
         if constraint_weight is None:
             constraint_weight = self.constraint_violation_weight
@@ -1166,6 +1628,56 @@ class MyCostModule(CostModule):
         # new reward function
         cost = demand_cost * demand_time_weight + \
             route_cost * route_time_weight + median_connectivity_weight*median_connectivity
+
+        street_pattern_class_count, street_pattern_penalty = self._street_pattern_penalty(state, cho.batch_routes)
+        cost = cost + street_pattern_weight * street_pattern_penalty
+        street_pattern_focus_class_share, street_pattern_focus_class_penalty = self._focus_class_penalty(
+            state,
+            cho.batch_routes,
+        )
+        cost = cost + focus_class_weight * street_pattern_focus_class_penalty
+        street_pattern_focus_class_presence_share, street_pattern_focus_class_presence_penalty = (
+            self._focus_class_presence_penalty(state, cho.batch_routes)
+        )
+        cost = cost + focus_class_presence_weight * street_pattern_focus_class_presence_penalty
+        street_pattern_focus_class_distribution_penalty = self._focus_class_distribution_penalty(
+            state,
+            cho.batch_routes,
+        )
+        cost = cost + focus_class_distribution_weight * street_pattern_focus_class_distribution_penalty
+        street_pattern_composition_diversity, street_pattern_composition_diversity_penalty = (
+            self._street_pattern_composition_diversity_penalty(state, cho.batch_routes)
+        )
+        cost = cost + street_pattern_diversity_weight * street_pattern_composition_diversity_penalty
+        street_pattern_target_distribution_penalty = self._street_pattern_target_distribution_penalty(
+            state,
+            cho.batch_routes,
+        )
+        cost = cost + street_pattern_target_distribution_weight * street_pattern_target_distribution_penalty
+        route_overlap_duplicate_edge_share, route_overlap_penalty = self._route_overlap_penalty(
+            state,
+            cho.batch_routes,
+        )
+        cost = cost + route_overlap_weight * route_overlap_penalty
+        route_focus_overlap_duplicate_edge_share, route_focus_overlap_penalty = self._focus_class_route_overlap_penalty(
+            state,
+            cho.batch_routes,
+        )
+        cost = cost + focus_class_overlap_weight * route_focus_overlap_penalty
+        cho.street_pattern_class_count = street_pattern_class_count
+        cho.street_pattern_penalty = street_pattern_penalty
+        cho.street_pattern_focus_class_share = street_pattern_focus_class_share
+        cho.street_pattern_focus_class_penalty = street_pattern_focus_class_penalty
+        cho.street_pattern_focus_class_presence_share = street_pattern_focus_class_presence_share
+        cho.street_pattern_focus_class_presence_penalty = street_pattern_focus_class_presence_penalty
+        cho.street_pattern_focus_class_distribution_penalty = street_pattern_focus_class_distribution_penalty
+        cho.street_pattern_composition_diversity = street_pattern_composition_diversity
+        cho.street_pattern_composition_diversity_penalty = street_pattern_composition_diversity_penalty
+        cho.street_pattern_target_distribution_penalty = street_pattern_target_distribution_penalty
+        cho.route_overlap_duplicate_edge_share = route_overlap_duplicate_edge_share
+        cho.route_overlap_penalty = route_overlap_penalty
+        cho.route_focus_overlap_duplicate_edge_share = route_focus_overlap_duplicate_edge_share
+        cho.route_focus_overlap_penalty = route_focus_overlap_penalty
 
         # compute the weight for the violated-constraint penalty, as an
          # upper bound on how bad the demand and route cost components may be

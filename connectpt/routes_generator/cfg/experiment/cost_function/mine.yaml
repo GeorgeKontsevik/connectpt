@@ -5,6 +5,8 @@ kwargs:
   demand_time_weight: 0.33
   route_time_weight: 0.33
   median_connectivity_weight: 0.33
+  street_pattern_weight: 0.0
+  street_pattern_diversity_weight: 0.0
   constraint_violation_weight: 5.0
   use_weighted_connectivity: True
   # demand and route weights will vary only during training
