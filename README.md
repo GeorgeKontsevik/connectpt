@@ -1,19 +1,21 @@
 # connectpt
 
-Public-transport preprocessing and route-generation toolkit.
+Public-transport preprocessing and route-generation toolkit used for stop/line preparation, synthetic route generation, and route dataset experiments.
 
-## Scheme
+## System Map
 
 ```mermaid
 flowchart LR
-    A[Inputs] --> B[Run: examples/preprocess/example_preprocess.ipynb]
-    B --> C[Checked outputs]
-    C --> D[Paper / thesis use]
+    RAW[raw PT / city graph] --> PRE[connectpt.preprocess]
+    PRE --> DATA[route-generation dataset]
+    DATA --> GEN[bee colony / learning models]
+    GEN --> EVAL[evaluation notebooks]
+    EVAL --> FIGS[analysis figures]
 ```
 
 ## Main Result
 
-![Main result](docs/readme_result.svg)
+![Demand and structure analysis](datasets/real_morph_10cities_bus50_heavy/analysis/07_structure_vs_demand_scatter.png)
 
 ## Run
 
@@ -25,14 +27,12 @@ Human:
 pip install -e . && jupyter notebook examples/preprocess/example_preprocess.ipynb
 ```
 
-Agent:
-
-Use iduedu-derived stops when available; do not force route diversity with fallback paths.
+Agent: use iduedu-derived stops when available; if generated routes duplicate each other, store and report that result instead of adding fallback diversity hacks.
 
 ## Publication
 
-No tracked paper/preprint in this repo.
+No standalone paper/preprint is tracked in this repo; dissertation use is coordinated from the parent project.
 
 ## Next Steps / Heuristics
 
-Heuristic: gravity demand is preferred for real training data; synthetic demand must be labeled.
+Heuristic: gravity demand is preferred for real training data; synthetic demand must be labeled. Keep preprocessing artifacts inspectable because they become the bridge into the main pipeline.
