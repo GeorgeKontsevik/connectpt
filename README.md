@@ -1,5 +1,7 @@
 # connectpt
 
+[![OSA-improved](https://img.shields.io/badge/improved%20by-OSA-yellow)](https://github.com/aimclub/OSA)
+
 Public-transport preprocessing and route-generation toolkit used for stop/line preparation, synthetic route generation, and route dataset experiments.
 
 ## System Map
@@ -36,3 +38,4 @@ No standalone paper/preprint is tracked in this repo; dissertation use is coordi
 ## Next Steps / Heuristics
 
 Heuristic: gravity demand is preferred for real training data; synthetic demand must be labeled. Keep preprocessing artifacts inspectable because they become the bridge into the main pipeline.
+
