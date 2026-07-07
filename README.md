@@ -15,7 +15,7 @@ flowchart LR
 
 ## Main Result
 
-![Demand and structure analysis](datasets/real_morph_10cities_bus50_heavy/analysis/07_structure_vs_demand_scatter.png)
+![Demand and structure analysis](docs/readme_main_result.png)
 
 ## Run
 
