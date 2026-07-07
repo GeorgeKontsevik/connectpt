@@ -62,3 +62,24 @@ examples/route_generator/experiment_results
 examples/route_generator/output_graphs
 examples/route_generator/output_routes
 examples/route_generator/training_logs
+
+# --- dissertation cookie-cutter ---
+.DS_Store
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+.venv/
+.venv-*/
+venv/
+.cache/
+*.tmp
+*.temp
+*~
+# --- /dissertation cookie-cutter ---
+
